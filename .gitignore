@@ -7,3 +7,5 @@
 !/public/uploads/.gitkeep
 .DS_Store
 Thumbs.db
+*.zip
+
