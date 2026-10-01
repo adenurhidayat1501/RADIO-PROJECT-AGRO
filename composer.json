@@ -1,0 +1,23 @@
+{
+  "name": "radio/self-hosted-platform",
+  "description": "Production Self-Hosted Internet Radio Platform for Ubuntu 24.04 (PHP + MongoDB + Icecast2 + Liquidsoap)",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "mongodb/mongodb": "^1.16"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    },
+    "files": [
+      "app/Helpers/functions.php"
+    ]
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true,
+    "allow-plugins": {}
+  }
+}

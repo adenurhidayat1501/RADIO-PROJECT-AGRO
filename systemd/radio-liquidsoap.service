@@ -1,0 +1,19 @@
+[Unit]
+Description=Radio Platform - Liquidsoap Auto DJ & Live Harbor Engine
+After=network.target mongod.service icecast2.service
+Requires=icecast2.service
+
+[Service]
+Type=simple
+User=radio
+Group=radio
+ExecStart=/usr/bin/liquidsoap /etc/radio/radio.liq
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/radio/liquidsoap.log
+StandardError=append:/var/log/radio/liquidsoap_error.log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

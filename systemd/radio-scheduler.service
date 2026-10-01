@@ -1,0 +1,17 @@
+[Unit]
+Description=Radio Platform - Automation Program Scheduler Worker
+After=network.target mongod.service radio-liquidsoap.service
+
+[Service]
+Type=simple
+User=radio
+Group=radio
+WorkingDirectory=/var/www/radio-platform
+ExecStart=/usr/bin/php /var/www/radio-platform/scripts/scheduler.php --loop
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/radio/scheduler.log
+StandardError=append:/var/log/radio/scheduler_error.log
+
+[Install]
+WantedBy=multi-user.target

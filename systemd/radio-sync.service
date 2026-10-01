@@ -1,0 +1,17 @@
+[Unit]
+Description=Radio Platform - Icecast Telemetry & Stream Sync Worker
+After=network.target icecast2.service mongod.service
+
+[Service]
+Type=simple
+User=radio
+Group=radio
+WorkingDirectory=/var/www/radio-platform
+ExecStart=/usr/bin/php /var/www/radio-platform/scripts/sync-radio.php --loop
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/radio/sync.log
+StandardError=append:/var/log/radio/sync_error.log
+
+[Install]
+WantedBy=multi-user.target
