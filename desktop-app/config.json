@@ -1,0 +1,8 @@
+{
+  "station_name": "Radio Agro",
+  "stream_url": "http://localhost:8000/live",
+  "api_url": "http://localhost:8080",
+  "auto_play": false,
+  "minimize_to_tray": true,
+  "volume": 85
+}
