@@ -386,8 +386,10 @@ nginx -t
 systemctl restart nginx
 
 echo -e "\n${BLUE}>>> Step 12: Configuring Firewall (UFW)...${NC}"
-ufw allow 80/tcp || true
-ufw allow 443/tcp || true
+ufw allow 22/tcp || true # SSH Remote Access
+ufw allow OpenSSH || true
+ufw allow 80/tcp || true # HTTP Web
+ufw allow 443/tcp || true # HTTPS Web
 ufw allow 8000/tcp || true # Icecast Direct
 ufw allow 8005/tcp || true # DJ Live Harbor
 ufw --force enable || true
