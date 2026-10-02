@@ -190,7 +190,7 @@ chmod +x "$TARGET_DIR"/scripts/*.php "$TARGET_DIR"/database/*.php 2>/dev/null ||
 
 # Run Composer Install
 export COMPOSER_ALLOW_SUPERUSER=1
-composer install --no-dev --optimize-autoloader --no-interaction
+composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=ext-mongodb
 
 # Create .env file
 APP_SECRET=$(openssl rand -hex 16)
