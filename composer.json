@@ -19,6 +19,23 @@
     "optimize-autoloader": true,
     "sort-packages": true,
     "allow-plugins": {},
-    "policy.advisories.block": false
+    "audit": {
+      "block": false,
+      "block-insecure": false,
+      "ignore": [
+        "PKSA-61k5-cqr9-b8b4"
+      ]
+    },
+    "policy": {
+      "advisories": {
+        "block": false,
+        "ignore": [
+          "mongodb/mongodb"
+        ],
+        "ignore-id": [
+          "PKSA-61k5-cqr9-b8b4"
+        ]
+      }
+    }
   }
 }
