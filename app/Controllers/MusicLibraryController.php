@@ -41,6 +41,32 @@ class MusicLibraryController extends BaseController
 
         $pagination = Song::paginate($filter, $page, 20, ['created_at' => -1]);
 
+        // Auto-heal any tracks displaying 0 bytes or 00:00 duration
+        foreach ($pagination['data'] as &$songItem) {
+            if ((empty($songItem['filesize']) || empty($songItem['duration'])) && !empty($songItem['filepath'])) {
+                clearstatcache(true, (string) $songItem['filepath']);
+                if (file_exists((string) $songItem['filepath'])) {
+                    $refreshed = Id3TagReader::read((string) $songItem['filepath']);
+                    $calcSize = (int) ($refreshed['filesize'] ?: filesize((string) $songItem['filepath']));
+                    $calcDur = (int) ($refreshed['duration'] ?: round(($calcSize * 8) / (128 * 1000)));
+
+                    $updateData = [];
+                    if (empty($songItem['filesize']) && $calcSize > 0) {
+                        $updateData['filesize'] = $calcSize;
+                        $songItem['filesize'] = $calcSize;
+                    }
+                    if (empty($songItem['duration']) && $calcDur > 0) {
+                        $updateData['duration'] = $calcDur;
+                        $songItem['duration'] = $calcDur;
+                    }
+                    if (!empty($updateData)) {
+                        Song::update((string) $songItem['_id'], $updateData);
+                    }
+                }
+            }
+        }
+        unset($songItem);
+
         $this->view('admin.music.index', [
             'songs' => $pagination['data'],
             'pagination' => $pagination,
@@ -118,7 +144,13 @@ class MusicLibraryController extends BaseController
         }
 
         // Read ID3 metadata
+        clearstatcache(true, $targetPath);
+        $finalSize = file_exists($targetPath) ? (int) filesize($targetPath) : (int) ($file['size'] ?? 0);
         $meta = Id3TagReader::read($targetPath);
+        $finalDuration = (int) ($meta['duration'] ?? 0);
+        if ($finalDuration <= 0 && $finalSize > 0) {
+            $finalDuration = (int) round(($finalSize * 8) / (128 * 1000));
+        }
 
         // Save metadata into MongoDB
         $song = Song::create([
@@ -127,10 +159,10 @@ class MusicLibraryController extends BaseController
             'album' => !empty($meta['album']) ? $meta['album'] : 'Single',
             'genre' => !empty($meta['genre']) ? $meta['genre'] : 'Various',
             'year' => (int) ($meta['year'] ?? date('Y')),
-            'duration' => (int) ($meta['duration'] ?? 0),
+            'duration' => $finalDuration,
             'filename' => $targetFilename,
             'filepath' => $targetPath,
-            'filesize' => (int) ($meta['filesize'] ?? filesize($targetPath)),
+            'filesize' => $finalSize ?: (int) ($meta['filesize'] ?? 0),
             'mime_type' => $mime,
             'cover' => '',
             'enabled' => true,
