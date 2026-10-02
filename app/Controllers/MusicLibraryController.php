@@ -61,8 +61,9 @@ class MusicLibraryController extends BaseController
 
         // Validate extension
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'aac'], true)) {
-            $this->redirect('admin/music', ['error' => 'Invalid audio format. Allowed: MP3, WAV, OGG, M4A, AAC.']);
+        $allowedExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mp4', 'wma'];
+        if (!in_array($ext, $allowedExts, true)) {
+            $this->redirect('admin/music', ['error' => 'Invalid audio format. Allowed: MP3, WAV, OGG, M4A, AAC, FLAC, MP4.']);
         }
 
         // Validate MIME type
@@ -72,15 +73,24 @@ class MusicLibraryController extends BaseController
 
         $allowedMimes = [
             'audio/mpeg', 'audio/mp3', 'audio/x-wav', 'audio/wav',
-            'audio/ogg', 'audio/x-m4a', 'audio/aac', 'application/octet-stream'
+            'audio/ogg', 'application/ogg', 'audio/x-m4a', 'audio/m4a', 'audio/aac',
+            'audio/x-aac', 'audio/mp4', 'video/mp4', 'video/x-m4v', 'audio/flac', 'audio/x-flac',
+            'application/octet-stream', 'audio/webm', 'video/webm', 'audio/x-ms-wma'
         ];
 
-        if (!in_array($mime, $allowedMimes, true)) {
-            $this->redirect('admin/music', ['error' => "Disallowed MIME type: {$mime}"]);
+        $isAudio = str_starts_with($mime, 'audio/') || in_array($mime, $allowedMimes, true);
+        if (!$isAudio) {
+            $this->redirect('admin/music', ['error' => "Disallowed file type: {$mime}"]);
         }
 
         // Generate sanitized unique filename
-        $safeBasename = preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME));
+        $rawBasename = pathinfo($file['name'], PATHINFO_FILENAME);
+        $safeBasename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $rawBasename);
+        $safeBasename = trim(preg_replace('/_+/', '_', $safeBasename), '_');
+        if (empty($safeBasename)) {
+            $safeBasename = 'track_' . time();
+        }
+
         $targetFilename = $safeBasename . '_' . time() . '.' . $ext;
         $targetPath = $this->storagePath . '/' . $targetFilename;
 
@@ -89,6 +99,22 @@ class MusicLibraryController extends BaseController
         }
 
         @chmod($targetPath, 0644);
+
+        // If file contains video container (e.g. video/mp4, video/webm from YouTube/TikTok downloads),
+        // extract and convert audio to clean pure 192k MP3 for seamless Liquidsoap & Icecast broadcasting
+        if (in_array($mime, ['video/mp4', 'video/webm', 'video/x-m4v', 'application/octet-stream'], true) || in_array($ext, ['mp4', 'm4v'], true)) {
+            $mp3Target = $this->storagePath . '/' . $safeBasename . '_' . time() . '.mp3';
+            $escapedSrc = escapeshellarg($targetPath);
+            $escapedDst = escapeshellarg($mp3Target);
+            @shell_exec("ffmpeg -y -i {$escapedSrc} -vn -acodec libmp3lame -b:a 192k {$escapedDst} 2>/dev/null");
+            if (file_exists($mp3Target) && filesize($mp3Target) > 1024) {
+                @unlink($targetPath);
+                $targetPath = $mp3Target;
+                $targetFilename = basename($mp3Target);
+                $ext = 'mp3';
+                $mime = 'audio/mpeg';
+            }
+        }
 
         // Read ID3 metadata
         $meta = Id3TagReader::read($targetPath);

@@ -33,17 +33,27 @@ class AdvertisementController extends BaseController
 
         $file = $_FILES['audio_file'];
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['mp3', 'wav', 'ogg'], true)) {
-            $this->redirect('admin/advertisements', ['error' => 'Allowed formats: MP3, WAV, OGG.']);
+        if (!in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mp4'], true)) {
+            $this->redirect('admin/advertisements', ['error' => 'Allowed formats: MP3, WAV, OGG, M4A, AAC, FLAC, MP4.']);
         }
 
         $title = trim((string) ($_POST['title'] ?? pathinfo($file['name'], PATHINFO_FILENAME)));
         $sponsor = trim((string) ($_POST['sponsor'] ?? ''));
         $safeBasename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $title);
+        $safeBasename = trim(preg_replace('/_+/', '_', $safeBasename), '_') ?: 'ad_' . time();
         $targetFilename = 'ad_' . $safeBasename . '_' . time() . '.' . $ext;
         $targetPath = $this->storagePath . '/' . $targetFilename;
 
         if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+            if (in_array($ext, ['mp4', 'm4v', 'm4a', 'aac'], true)) {
+                $mp3Target = $this->storagePath . '/ad_' . $safeBasename . '_' . time() . '.mp3';
+                @shell_exec('ffmpeg -y -i ' . escapeshellarg($targetPath) . ' -vn -acodec libmp3lame -b:a 192k ' . escapeshellarg($mp3Target) . ' 2>/dev/null');
+                if (file_exists($mp3Target) && filesize($mp3Target) > 1024) {
+                    @unlink($targetPath);
+                    $targetPath = $mp3Target;
+                    $targetFilename = basename($mp3Target);
+                }
+            }
             $meta = Id3TagReader::read($targetPath);
             Advertisement::create([
                 'title' => $title,

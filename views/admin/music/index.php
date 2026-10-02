@@ -142,11 +142,11 @@
                         Audio files are validated, stored in <code><?= e($storagePath) ?></code>, and their ID3 tags are extracted into MongoDB automatically.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Audio File (.mp3, .wav, .ogg, .aac)</label>
-                        <input type="file" name="audio_file" class="form-control" accept="audio/*,.mp3,.wav,.ogg,.aac" required>
+                        <label class="form-label fw-semibold">Audio File (.mp3, .wav, .ogg, .aac, .m4a, .mp4, .flac)</label>
+                        <input type="file" name="audio_file" class="form-control" accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a,.mp4,.flac" required>
                     </div>
                     <div class="form-text small">
-                        Allowed extensions: .mp3, .wav, .ogg, .aac, .m4a. Max size depends on PHP configuration (default up to 100MB).
+                        Allowed extensions: .mp3, .wav, .ogg, .aac, .m4a, .mp4, .flac. Media files with video containers are automatically converted to clean MP3. Max size up to 128MB.
                     </div>
                 </div>
                 <div class="modal-footer">
