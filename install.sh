@@ -173,7 +173,8 @@ if [ ! -f /var/lib/radio/fallback/default.mp3 ]; then
     ffmpeg -y -f lavfi -i "sine=frequency=440:duration=10" -c:a libmp3lame -b:a 128k /var/lib/radio/fallback/default.mp3 &>/dev/null
 fi
 
-chown -R radio:radio /var/lib/radio /var/log/radio /etc/radio
+chown -R www-data:radio /var/lib/radio /var/log/radio
+chown -R radio:radio /etc/radio
 chmod -R 2775 /var/lib/radio /var/log/radio /etc/radio
 
 echo -e "\n${BLUE}>>> Step 6: Deploying Application Source Code & Dependencies...${NC}"
