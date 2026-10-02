@@ -2,10 +2,10 @@
 # ==============================================================================
 # SELF-HOSTED INTERNET RADIO PLATFORM - AUTOMATED VPS INSTALLER
 # Target OS: Ubuntu 24.04 LTS (Noble Numbat)
-# Architecture: PHP 8.3/8.2 + MongoDB + Icecast2 + Liquidsoap + FFmpeg + Nginx
+# Architecture: PHP 8.3 + MongoDB 8.0 + Icecast2 + Liquidsoap 2.2 + FFmpeg + Nginx
 # ==============================================================================
 
-set -e
+set -eo pipefail
 
 # ANSI Color Codes
 GREEN="\033[1;32m"
@@ -25,66 +25,96 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Detect Ubuntu Version
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [ "$ID" != "ubuntu" ]; then
+        echo -e "${YELLOW}[WARNING] This script is optimized for Ubuntu 24.04 LTS. Detected OS: ${PRETTY_NAME}${NC}"
+    fi
+fi
+
+UBUNTU_CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="/var/www/radio-platform"
 
-echo -e "${BLUE}>>> Step 1: Gathering Installation Parameters...${NC}"
+echo -e "\n${BLUE}>>> Step 1: Gathering Installation Parameters...${NC}"
 
-# Prompt for Configuration (with sensible defaults)
-read -p "Enter Radio Station Name [Radio Agro]: " INPUT_STATION_NAME
-STATION_NAME="${INPUT_STATION_NAME:-Radio Agro}"
-
-read -p "Enter Primary Domain Name [radio.example.com]: " INPUT_DOMAIN
-DOMAIN="${INPUT_DOMAIN:-radio.example.com}"
-
-read -p "Enter Admin Initial Username [admin]: " INPUT_ADMIN_USER
-ADMIN_USER="${INPUT_ADMIN_USER:-admin}"
-
-read -s -p "Enter Admin Initial Password [leave blank for auto-generated]: " INPUT_ADMIN_PASS
-echo ""
-if [ -z "$INPUT_ADMIN_PASS" ]; then
-    ADMIN_PASS=$(openssl rand -hex 6)
-    echo -e "${YELLOW}Generated Random Admin Password: ${ADMIN_PASS}${NC}"
-else
-    ADMIN_PASS="$INPUT_ADMIN_PASS"
+# Support non-interactive mode or environment variable overrides
+if [ -z "${STATION_NAME:-}" ]; then
+    read -p "Enter Radio Station Name [Radio Agro]: " INPUT_STATION_NAME
+    STATION_NAME="${INPUT_STATION_NAME:-Radio Agro}"
 fi
 
-read -p "Enter Stream Mountpoint [/live]: " INPUT_MOUNT
-STREAM_MOUNT="${INPUT_MOUNT:-/live}"
+if [ -z "${DOMAIN:-}" ]; then
+    read -p "Enter Primary Domain Name [radio.example.com]: " INPUT_DOMAIN
+    DOMAIN="${INPUT_DOMAIN:-radio.example.com}"
+fi
 
-read -p "Enter Stream Bitrate (64, 128, 192, 256, 320) [128]: " INPUT_BITRATE
-STREAM_BITRATE="${INPUT_BITRATE:-128}"
+if [ -z "${ADMIN_USER:-}" ]; then
+    read -p "Enter Admin Initial Username [admin]: " INPUT_ADMIN_USER
+    ADMIN_USER="${INPUT_ADMIN_USER:-admin}"
+fi
 
-read -p "Enter Icecast Source Password [auto-generated]: " INPUT_ICE_SRC
-ICE_SRC_PASS="${INPUT_ICE_SRC:-$(openssl rand -hex 8)}"
+if [ -z "${ADMIN_PASS:-}" ]; then
+    read -s -p "Enter Admin Initial Password [leave blank for auto-generated]: " INPUT_ADMIN_PASS
+    echo ""
+    if [ -z "$INPUT_ADMIN_PASS" ]; then
+        ADMIN_PASS=$(openssl rand -hex 6)
+        echo -e "${YELLOW}Generated Random Admin Password: ${ADMIN_PASS}${NC}"
+    else
+        ADMIN_PASS="$INPUT_ADMIN_PASS"
+    fi
+fi
 
-read -p "Enter Icecast Admin Password [auto-generated]: " INPUT_ICE_ADM
-ICE_ADM_PASS="${INPUT_ICE_ADM:-$(openssl rand -hex 8)}"
+if [ -z "${STREAM_MOUNT:-}" ]; then
+    read -p "Enter Stream Mountpoint [/live]: " INPUT_MOUNT
+    STREAM_MOUNT="${INPUT_MOUNT:-/live}"
+fi
 
-read -p "Enter DJ Harbor Password [auto-generated]: " INPUT_HARBOR_PASS
-HARBOR_PASS="${INPUT_HARBOR_PASS:-$(openssl rand -hex 8)}"
+if [ -z "${STREAM_BITRATE:-}" ]; then
+    read -p "Enter Stream Bitrate (64, 128, 192, 256, 320) [128]: " INPUT_BITRATE
+    STREAM_BITRATE="${INPUT_BITRATE:-128}"
+fi
+
+ICE_SRC_PASS="${ICE_SRC_PASS:-$(openssl rand -hex 8)}"
+ICE_ADM_PASS="${ICE_ADM_PASS:-$(openssl rand -hex 8)}"
+HARBOR_PASS="${HARBOR_PASS:-$(openssl rand -hex 8)}"
 
 echo -e "\n${BLUE}>>> Step 2: Updating Package Repositories & System Packages...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y curl wget gnupg2 ca-certificates lsb-release apt-transport-https software-properties-common ufw
 
-echo -e "${BLUE}>>> Step 3: Installing MongoDB Official Community Edition...${NC}"
-# MongoDB 7.0 for Ubuntu 24.04 (or 8.0)
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg --yes
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+# Ensure universe repository is active on Ubuntu 24.04 (contains icecast2 & liquidsoap)
+add-apt-repository -y universe
+apt-get update -y
+
+echo -e "\n${BLUE}>>> Step 3: Installing MongoDB Official Community Edition (Ubuntu 24.04 Noble)...${NC}"
+# MongoDB 8.0 is the official LTS release built natively for Ubuntu 24.04 (Noble)
+curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg --yes
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${UBUNTU_CODENAME}/mongodb-org/8.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-8.0.list
 
 apt-get update -y
-apt-get install -y mongodb-org || {
-    echo -e "${YELLOW}Falling back to distro-packaged mongodb/mongodb-org...${NC}"
-    apt-get install -y mongodb
+apt-get install -y mongodb-org mongodb-database-tools || {
+    echo -e "${YELLOW}Falling back to MongoDB 7.0 repository...${NC}"
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg --yes
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${UBUNTU_CODENAME}/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+    apt-get update -y
+    apt-get install -y mongodb-org mongodb-database-tools
 }
 
 systemctl daemon-reload
-systemctl enable mongod || systemctl enable mongodb
-systemctl restart mongod || systemctl restart mongodb
+systemctl enable mongod
+systemctl restart mongod
 
-echo -e "${BLUE}>>> Step 4: Installing Nginx, PHP, Liquidsoap, Icecast2, FFmpeg, and Certbot...${NC}"
+# Verify MongoDB is running
+if ! systemctl is-active --quiet mongod; then
+    echo -e "${RED}[ERROR] MongoDB service failed to start. Check /var/log/mongodb/mongod.log for details.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}MongoDB service is active and running.${NC}"
+
+echo -e "\n${BLUE}>>> Step 4: Installing Nginx, PHP 8.3, Liquidsoap, Icecast2, FFmpeg, and Certbot...${NC}"
 apt-get install -y \
     nginx \
     php-fpm php-cli php-mongodb php-curl php-xml php-mbstring php-zip php-gd \
@@ -100,10 +130,33 @@ if ! command -v composer &> /dev/null; then
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 fi
 
-echo -e "${BLUE}>>> Step 5: Creating Dedicated System User & Storage Directories...${NC}"
+# Detect installed PHP version (Ubuntu 24.04 default is 8.3)
+PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
+echo -e "${CYAN}Detected PHP Version: ${PHP_VER}${NC}"
+
+# Optimize PHP-FPM and CLI php.ini for Audio Uploads (up to 128MB per track)
+for PHP_INI in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/cli/php.ini"; do
+    if [ -f "$PHP_INI" ]; then
+        echo -e "Tuning upload limits in ${PHP_INI}..."
+        sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 128M/' "$PHP_INI"
+        sed -i 's/^post_max_size = .*/post_max_size = 128M/' "$PHP_INI"
+        sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
+        sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
+    fi
+done
+
+# Restart PHP-FPM service to apply changes
+systemctl enable "php${PHP_VER}-fpm" || systemctl enable php-fpm || true
+systemctl restart "php${PHP_VER}-fpm" || systemctl restart php-fpm || true
+
+echo -e "\n${BLUE}>>> Step 5: Creating Dedicated System User & Storage Directories...${NC}"
 if ! id -u radio &>/dev/null; then
     useradd -r -s /usr/sbin/nologin -d /var/lib/radio radio
 fi
+
+# Add www-data and radio to each other's groups for seamless file and log sharing
+usermod -a -G radio www-data
+usermod -a -G www-data radio
 
 mkdir -p /var/lib/radio/music
 mkdir -p /var/lib/radio/jingles
@@ -121,17 +174,22 @@ if [ ! -f /var/lib/radio/fallback/default.mp3 ]; then
 fi
 
 chown -R radio:radio /var/lib/radio /var/log/radio /etc/radio
-chmod -R 775 /var/lib/radio /var/log/radio /etc/radio
+chmod -R 2775 /var/lib/radio /var/log/radio /etc/radio
 
-echo -e "${BLUE}>>> Step 6: Deploying Application Source Code & Dependencies...${NC}"
+echo -e "\n${BLUE}>>> Step 6: Deploying Application Source Code & Dependencies...${NC}"
 if [ "$APP_DIR" != "$TARGET_DIR" ]; then
-    cp -r "$APP_DIR"/* "$TARGET_DIR"/
-    cp -r "$APP_DIR"/.[!.]* "$TARGET_DIR"/ 2>/dev/null || true
+    echo -e "Copying application source from ${APP_DIR} to ${TARGET_DIR}..."
+    mkdir -p "$TARGET_DIR"
+    cp -a "$APP_DIR"/. "$TARGET_DIR"/
 fi
 
 cd "$TARGET_DIR"
 
+# Set executable flags on scripts
+chmod +x "$TARGET_DIR"/scripts/*.php "$TARGET_DIR"/database/*.php 2>/dev/null || true
+
 # Run Composer Install
+export COMPOSER_ALLOW_SUPERUSER=1
 composer install --no-dev --optimize-autoloader --no-interaction
 
 # Create .env file
@@ -186,11 +244,19 @@ SESSION_LIFETIME=86400
 EOF
 
 # Ensure writable permissions for web and radio user
+mkdir -p "$TARGET_DIR/storage/logs" "$TARGET_DIR/storage/backups" "$TARGET_DIR/public/uploads"
 chown -R www-data:www-data "$TARGET_DIR"
 chown -R www-data:radio "$TARGET_DIR/storage" "$TARGET_DIR/public/uploads"
-chmod -R 775 "$TARGET_DIR/storage" "$TARGET_DIR/public/uploads"
+chmod -R 2775 "$TARGET_DIR/storage" "$TARGET_DIR/public/uploads"
 
-echo -e "${BLUE}>>> Step 7: Configuring Icecast2 Streaming Server...${NC}"
+# Configure sudoers rule so www-data can reload/restart radio-liquidsoap safely from Web UI
+echo -e "Configuring sudoers permissions for www-data service control..."
+cat > /etc/sudoers.d/radio-platform <<'SUDO_EOF'
+www-data ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload radio-liquidsoap, /usr/bin/systemctl restart radio-liquidsoap, /usr/bin/systemctl status radio-liquidsoap, /usr/bin/systemctl restart radio-scheduler, /usr/bin/systemctl restart radio-sync, /usr/bin/systemctl status radio-scheduler, /usr/bin/systemctl status radio-sync
+SUDO_EOF
+chmod 440 /etc/sudoers.d/radio-platform
+
+echo -e "\n${BLUE}>>> Step 7: Configuring Icecast2 Streaming Server...${NC}"
 cat > /etc/icecast2/icecast.xml <<EOF
 <icecast>
     <location>Indonesia</location>
@@ -241,18 +307,22 @@ cat > /etc/icecast2/icecast.xml <<EOF
 </icecast>
 EOF
 
+# Ensure icecast2 permissions
+chown -R icecast2:icecast /etc/icecast2 /var/log/icecast2
+chmod 640 /etc/icecast2/icecast.xml
+
 # Enable icecast2 in /etc/default/icecast2
 sed -i 's/ENABLE=false/ENABLE=true/g' /etc/default/icecast2 2>/dev/null || true
 systemctl restart icecast2
 systemctl enable icecast2
 
-echo -e "${BLUE}>>> Step 8: Initializing MongoDB Indexes & Seeding Administrator...${NC}"
+echo -e "\n${BLUE}>>> Step 8: Initializing MongoDB Indexes & Seeding Administrator...${NC}"
 # Run database indexes script
 php "$TARGET_DIR/database/indexes.php"
 
 # Seed Admin User in MongoDB
 php -r "
-require_once '$TARGET_DIR/public/index.php';
+require_once '$TARGET_DIR/bootstrap.php';
 use App\Models\User;
 \$existing = User::findOne(['username' => '${ADMIN_USER}']);
 if (!\$existing) {
@@ -271,10 +341,12 @@ if (!\$existing) {
 }
 "
 
-echo -e "${BLUE}>>> Step 9: Compiling Liquidsoap Configuration & Testing Auto DJ...${NC}"
+echo -e "\n${BLUE}>>> Step 9: Compiling Liquidsoap Configuration & Testing Auto DJ...${NC}"
 php "$TARGET_DIR/scripts/generate-liquidsoap.php"
+chown radio:radio /etc/radio/radio.liq
+chmod 664 /etc/radio/radio.liq
 
-echo -e "${BLUE}>>> Step 10: Installing Systemd Service Units...${NC}"
+echo -e "\n${BLUE}>>> Step 10: Installing Systemd Service Units...${NC}"
 cp "$TARGET_DIR/systemd/radio-liquidsoap.service" /etc/systemd/system/
 cp "$TARGET_DIR/systemd/radio-scheduler.service" /etc/systemd/system/
 cp "$TARGET_DIR/systemd/radio-sync.service" /etc/systemd/system/
@@ -288,11 +360,14 @@ systemctl restart radio-liquidsoap.service
 systemctl restart radio-scheduler.service
 systemctl restart radio-sync.service
 
-echo -e "${BLUE}>>> Step 11: Configuring Nginx Reverse Proxy...${NC}"
+echo -e "\n${BLUE}>>> Step 11: Configuring Nginx Reverse Proxy...${NC}"
 # Determine PHP-FPM socket version
-PHP_SOCK="/run/php/php8.3-fpm.sock"
+PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
 if [ ! -S "$PHP_SOCK" ]; then
-    PHP_SOCK=$(find /run/php/ -name "php*-fpm.sock" | head -n 1)
+    FOUND_SOCK=$(find /run/php/ -name "php*-fpm.sock" | head -n 1)
+    if [ -n "$FOUND_SOCK" ]; then
+        PHP_SOCK="$FOUND_SOCK"
+    fi
 fi
 
 sed -e "s|radio.yourdomain.com|${DOMAIN}|g" \
@@ -306,12 +381,12 @@ rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 nginx -t
 systemctl restart nginx
 
-echo -e "${BLUE}>>> Step 12: Configuring Firewall (UFW)...${NC}"
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 8000/tcp # Icecast Direct
-ufw allow 8005/tcp # DJ Live Harbor
-ufw --force enable
+echo -e "\n${BLUE}>>> Step 12: Configuring Firewall (UFW)...${NC}"
+ufw allow 80/tcp || true
+ufw allow 443/tcp || true
+ufw allow 8000/tcp || true # Icecast Direct
+ufw allow 8005/tcp || true # DJ Live Harbor
+ufw --force enable || true
 
 echo -e "\n${CYAN}==============================================================================${NC}"
 echo -e "${GREEN}      RADIO PLATFORM INSTALLATION COMPLETED SUCCESSFULLY!${NC}"
@@ -328,6 +403,3 @@ echo -e "${CYAN}----------------------------------------------------------------
 echo -e "To configure SSL HTTPS with Let's Encrypt, run:"
 echo -e "  ${YELLOW}certbot --nginx -d ${DOMAIN}${NC}"
 echo -e "${CYAN}==============================================================================${NC}\n"
-EOF
-
-chmod +x install.sh

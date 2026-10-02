@@ -177,23 +177,27 @@ Installer akan secara otomatis melakukan:
 
 Jika Anda ingin memahami alur instalasi atau melakukan kustomisasi arsitektur secara manual, ikuti tahapan berikut:
 
-### Langkah 5.1: Update Sistem & Pasang Paket Dasar
+### Langkah 5.1: Update Sistem, Aktifkan Universe & Pasang Paket Dasar
 ```bash
 sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get install -y curl wget gnupg2 ca-certificates lsb-release apt-transport-https software-properties-common ufw git unzip
+
+# Aktifkan repositori universe (wajib untuk icecast2 & liquidsoap di Ubuntu 24.04)
+sudo add-apt-repository -y universe
+sudo apt-get update -y
 ```
 
-### Langkah 5.2: Pasang MongoDB Resmi
+### Langkah 5.2: Pasang MongoDB 8.0 Resmi (Ubuntu 24.04 Noble)
 ```bash
-# Tambahkan GPG Key resmi MongoDB
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg --yes
+# Tambahkan GPG Key resmi MongoDB 8.0
+curl -fsSL https://pgp.mongodb.com/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg --yes
 
-# Tambahkan Repositori MongoDB
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+# Tambahkan Repositori MongoDB 8.0 Noble
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
 
-# Update & Pasang MongoDB Server
+# Update & Pasang MongoDB Server & Tools
 sudo apt-get update -y
-sudo apt-get install -y mongodb-org
+sudo apt-get install -y mongodb-org mongodb-database-tools
 
 # Nyalakan MongoDB Service
 sudo systemctl daemon-reload
@@ -201,7 +205,7 @@ sudo systemctl enable mongod
 sudo systemctl start mongod
 ```
 
-### Langkah 5.3: Pasang Nginx, PHP 8.3/8.2 & Ekstensi
+### Langkah 5.3: Pasang Nginx, PHP 8.3 & Ekstensi
 ```bash
 sudo apt-get install -y \
     nginx \
@@ -210,6 +214,18 @@ sudo apt-get install -y \
     liquidsoap \
     ffmpeg \
     certbot python3-certbot-nginx
+
+# Optimasi batas upload PHP (untuk file audio hingga 128MB)
+PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
+for ini in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/cli/php.ini"; do
+    if [ -f "$ini" ]; then
+        sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 128M/' "$ini"
+        sudo sed -i 's/^post_max_size = .*/post_max_size = 128M/' "$ini"
+        sudo sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$ini"
+        sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$ini"
+    fi
+done
+sudo systemctl restart "php${PHP_VER}-fpm"
 ```
 
 ### Langkah 5.4: Pasang Composer Secara Global
@@ -221,9 +237,13 @@ if ! command -v composer &> /dev/null; then
 fi
 ```
 
-### Langkah 5.5: Buat User Sistem & Direktori Audio
+### Langkah 5.5: Buat User Sistem, Izin Akses & Direktori Audio
 ```bash
 sudo useradd -r -s /usr/sbin/nologin -d /var/lib/radio radio 2>/dev/null || true
+
+# Gabungkan user www-data dan radio agar berbagi akses file audio & log tanpa konflik
+sudo usermod -a -G radio www-data
+sudo usermod -a -G www-data radio
 
 sudo mkdir -p /var/lib/radio/music
 sudo mkdir -p /var/lib/radio/jingles
@@ -238,7 +258,7 @@ sudo mkdir -p /var/www/radio-platform
 sudo ffmpeg -y -f lavfi -i "sine=frequency=440:duration=10" -c:a libmp3lame -b:a 128k /var/lib/radio/fallback/default.mp3
 
 sudo chown -R radio:radio /var/lib/radio /var/log/radio /etc/radio
-sudo chmod -R 775 /var/lib/radio /var/log/radio /etc/radio
+sudo chmod -R 2775 /var/lib/radio /var/log/radio /etc/radio
 ```
 
 ### Langkah 5.6: Setup Kode Sumber & Dependencies
@@ -251,7 +271,11 @@ composer install --no-dev --optimize-autoloader
 # Atur permissions
 sudo chown -R www-data:www-data /var/www/radio-platform
 sudo chown -R www-data:radio /var/www/radio-platform/storage /var/www/radio-platform/public/uploads
-sudo chmod -R 775 /var/www/radio-platform/storage /var/www/radio-platform/public/uploads
+sudo chmod -R 2775 /var/www/radio-platform/storage /var/www/radio-platform/public/uploads
+
+# Beri izin www-data untuk reload service Liquidsoap dari panel admin
+echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload radio-liquidsoap, /usr/bin/systemctl restart radio-liquidsoap, /usr/bin/systemctl status radio-liquidsoap, /usr/bin/systemctl restart radio-scheduler, /usr/bin/systemctl restart radio-sync, /usr/bin/systemctl status radio-scheduler, /usr/bin/systemctl status radio-sync' | sudo tee /etc/sudoers.d/radio-platform
+sudo chmod 440 /etc/sudoers.d/radio-platform
 ```
 
 ### Langkah 5.7: Konfigurasi File Lingkungan (`.env`)
@@ -267,8 +291,10 @@ Edit `/etc/icecast2/icecast.xml` dan sesuaikan kata sandi:
 ```bash
 sudo nano /etc/icecast2/icecast.xml
 ```
-Pastikan `ENABLE=true` di `/etc/default/icecast2`:
+Pastikan kepemilikan dan `ENABLE=true` di `/etc/default/icecast2`:
 ```bash
+sudo chown -R icecast2:icecast /etc/icecast2 /var/log/icecast2
+sudo chmod 640 /etc/icecast2/icecast.xml
 sudo sed -i 's/ENABLE=false/ENABLE=true/g' /etc/default/icecast2
 sudo systemctl enable icecast2
 sudo systemctl restart icecast2
@@ -283,7 +309,7 @@ php database/indexes.php
 Buat akun admin pertama melalui perintah one-liner PHP:
 ```bash
 php -r "
-require_once 'public/index.php';
+require_once 'bootstrap.php';
 use App\Models\User;
 User::createUser([
     'username' => 'admin',
@@ -300,6 +326,8 @@ echo 'Admin siap digunakan.\n';
 ### Langkah 5.10: Kompilasi Konfigurasi Liquidsoap
 ```bash
 php scripts/generate-liquidsoap.php
+sudo chown radio:radio /etc/radio/radio.liq
+sudo chmod 664 /etc/radio/radio.liq
 ```
 
 ### Langkah 5.11: Pasang Unit Service Systemd

@@ -1,3 +1,4 @@
+#!/usr/bin/env php
 <?php
 
 declare(strict_types=1);
@@ -7,7 +8,7 @@ if (php_sapi_name() !== 'cli') {
     die("This script must be run from CLI.\n");
 }
 
-require_once __DIR__ . '/../public/index.php';
+require_once __DIR__ . '/../bootstrap.php';
 
 use App\Services\IcecastService;
 use App\Helpers\Logger;

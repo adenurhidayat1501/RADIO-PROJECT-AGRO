@@ -11,7 +11,7 @@ class Logger
     public static function log(string $level, string $message, array $context = [], string $channel = 'app'): void
     {
         if (!is_dir(self::$logDir)) {
-            @mkdir(self::$logDir, 0755, true);
+            @mkdir(self::$logDir, 0775, true);
         }
 
         $filename = self::$logDir . '/' . preg_replace('/[^a-z0-9_-]/i', '', $channel) . '.log';
@@ -20,6 +20,7 @@ class Logger
         $line = sprintf("[%s] [%s] %s%s\n", $timestamp, strtoupper($level), $message, $contextStr);
 
         @file_put_contents($filename, $line, FILE_APPEND | LOCK_EX);
+        @chmod($filename, 0664);
     }
 
     public static function info(string $message, array $context = [], string $channel = 'app'): void

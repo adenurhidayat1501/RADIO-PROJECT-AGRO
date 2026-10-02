@@ -157,33 +157,35 @@ class LiquidsoapService
 
         $apiUrl = rtrim(config('app.url', 'http://127.0.0.1:8080'), '/');
 
-        // Build Liquidsoap Script
+        // Build Liquidsoap Script (Compatible with Liquidsoap 2.2.x on Ubuntu 24.04 LTS)
         $liq = <<<LIQ
 #!/usr/bin/liquidsoap
 
 # ==============================================================================
 # RADIO PLATFORM - AUTOMATED LIQUIDSOAP CONFIGURATION
-# Generated dynamically by PHP Management Service
+# Generated dynamically by PHP Management Service (Ubuntu 24.04 LTS / Liquidsoap 2.2.x)
 # ==============================================================================
 
 # 1. Global Server Settings
-set("log.file.path", "/var/log/radio/liquidsoap.log")
-set("log.level", 3)
-set("server.telnet", true)
-set("server.telnet.bind_addr", "127.0.0.1")
-set("server.telnet.port", {$telnetPort})
+settings.log.file.path.set("/var/log/radio/liquidsoap.log")
+settings.log.level.set(3)
+settings.server.telnet.set(true)
+settings.server.telnet.bind_addr.set("127.0.0.1")
+settings.server.telnet.port.set({$telnetPort})
 
 # 2. Audio Processing Parameters
-set("frame.audio.samplerate", 44100)
-set("frame.audio.channels", 2)
+settings.frame.audio.samplerate.set(44100)
+settings.frame.audio.channels.set(2)
 
 # 3. Notification Callbacks
 def notify_metadata(m) =
-  title = m["title"]
   artist = m["artist"]
-  print("TRACK TRANSITION: #{artist} - #{title}")
+  title = m["title"]
+  t_artist = if artist != "" then artist else "Unknown Artist" end
+  t_title = if title != "" then title else "Unknown Title" end
+  print("TRACK TRANSITION: #{t_artist} - #{t_title}")
   # Notify local web API in background
-  ignore(http.get("{$apiUrl}/api/internal/liquidsoap/on-track?artist=" ^ url.encode(artist) ^ "&title=" ^ url.encode(title)))
+  ignore(http.get("{$apiUrl}/api/internal/liquidsoap/on-track?artist=" ^ url.encode(t_artist) ^ "&title=" ^ url.encode(t_title)))
 end
 
 def notify_live_connect(m) =
@@ -225,8 +227,6 @@ live_harbor = input.harbor(
   id="live_dj",
   "{$harborMount}",
   port={$harborPort},
-  user="{$harborUser}",
-  password="{$harborPass}",
   auth=fun(user, pass) -> (user == "{$harborUser}" and pass == "{$harborPass}"),
   on_connect=notify_live_connect,
   on_disconnect=notify_live_disconnect
@@ -234,28 +234,29 @@ live_harbor = input.harbor(
 
 # 7. Priority Fallback & Smart Crossfade Switching
 # Live DJ has highest priority (1). When DJ disconnects, Auto DJ smoothly resumes.
+def transition_fade(a, b) =
+  add(normalize=false, [fade.initial(duration=2.0, b), fade.final(duration=2.0, a)])
+end
+
 radio_stream = fallback(
   id="main_switch",
   track_sensitive=false,
-  transitions=[
-    fun(a,b) -> crossfade(fade_in=3.0, fade_out=3.0, b, a),
-    fun(a,b) -> crossfade(fade_in=2.0, fade_out=2.0, b, a)
-  ],
+  transitions=[transition_fade, transition_fade],
   [live_harbor, autodj_source, emergency_source]
 )
 
 # Apply metadata monitoring hook
 radio_stream = on_metadata(notify_metadata, radio_stream)
 
-# Apply Smart Crossfade for AutoDJ tracks
+# Apply Crossfade for AutoDJ tracks
 radio_stream = crossfade(
-  start_next=2.5,
+  duration=3.0,
   fade_in=2.0,
-  fade_out=2.5,
+  fade_out=2.0,
   radio_stream
 )
 
-# 8. Output to Icecast2 Server
+# 8. Output to Icecast2 Server (mksafe guarantees infallible output stream)
 output.icecast(
   %mp3(bitrate={$bitrate}),
   id="output_icecast",
@@ -268,7 +269,7 @@ output.icecast(
   genre="{$station['genre']}",
   url="{$apiUrl}",
   public=false,
-  radio_stream
+  mksafe(radio_stream)
 )
 LIQ;
 
