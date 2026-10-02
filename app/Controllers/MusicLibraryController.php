@@ -16,8 +16,9 @@ class MusicLibraryController extends BaseController
     {
         $this->storagePath = config('radio.paths.music', '/var/lib/radio/music');
         if (!is_dir($this->storagePath)) {
-            @mkdir($this->storagePath, 0755, true);
+            @mkdir($this->storagePath, 0775, true);
         }
+        @chmod($this->storagePath, 0775);
     }
 
     public function index(): void
