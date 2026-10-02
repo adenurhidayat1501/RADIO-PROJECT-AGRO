@@ -190,6 +190,8 @@ chmod +x "$TARGET_DIR"/scripts/*.php "$TARGET_DIR"/database/*.php 2>/dev/null ||
 
 # Run Composer Install
 export COMPOSER_ALLOW_SUPERUSER=1
+export COMPOSER_NO_BLOCKING=1
+composer config policy.advisories.block false 2>/dev/null || true
 composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=ext-mongodb
 
 # Create .env file
