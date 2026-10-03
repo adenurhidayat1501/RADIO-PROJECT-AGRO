@@ -17,6 +17,204 @@
 
     <!-- Custom Aurora Design System Styling -->
     <link rel="stylesheet" href="<?= asset('css/public.css') ?>">
+
+    <!-- Critical Design System Tokens & Anti-Cache Embed -->
+    <style id="radio-agro-critical-tokens">
+        :root {
+            --bg-canvas: #04070d;
+            --primary: #10b981;
+            --cyan: #06b6d4;
+        }
+        body {
+            background-color: #04070d !important;
+            color: #f8fafc !important;
+            font-family: 'Inter', -apple-system, sans-serif !important;
+        }
+        .hero-deck .glass-card {
+            background: rgba(11, 19, 36, 0.82) !important;
+            backdrop-filter: blur(28px) !important;
+            -webkit-backdrop-filter: blur(28px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 28px !important;
+            box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(16, 185, 129, 0.15) !important;
+        }
+        .turntable-plinth {
+            position: relative;
+            width: 270px;
+            height: 270px;
+            margin: 0 auto;
+            background: radial-gradient(circle at 35% 35%, #182234 0%, #0b1324 60%, #040812 100%) !important;
+            border-radius: 28px !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.18), inset 0 -4px 10px rgba(0, 0, 0, 0.8), 0 20px 50px -10px rgba(0, 0, 0, 0.85), 0 0 30px rgba(16, 185, 129, 0.15) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        .turntable-platter {
+            position: relative;
+            width: 226px;
+            height: 226px;
+            border-radius: 50%;
+            background: #020408 !important;
+            box-shadow: 0 0 0 4px #1e293b, 0 0 0 6px rgba(16, 185, 129, 0.35), 0 10px 30px rgba(0, 0, 0, 0.9) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .vinyl-disc {
+            width: 214px !important;
+            height: 214px !important;
+            border-radius: 50% !important;
+            background: radial-gradient(circle at center, transparent 32%, rgba(255, 255, 255, 0.05) 33%, transparent 34%), radial-gradient(circle at center, transparent 42%, rgba(255, 255, 255, 0.04) 43%, transparent 44%), radial-gradient(circle at center, transparent 52%, rgba(255, 255, 255, 0.04) 53%, transparent 54%), radial-gradient(circle at center, transparent 65%, rgba(255, 255, 255, 0.035) 66%, transparent 67%), radial-gradient(circle at center, transparent 78%, rgba(255, 255, 255, 0.04) 79%, transparent 80%), radial-gradient(circle at center, transparent 88%, rgba(255, 255, 255, 0.03) 89%, transparent 90%), conic-gradient(from 45deg, #222d3d 0deg, #090e18 60deg, #2a374a 120deg, #0a0f19 180deg, #222d3d 240deg, #090e18 300deg, #222d3d 360deg) !important;
+            border: 3px solid rgba(255, 255, 255, 0.1) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.95) !important;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .vinyl-disc.spinning {
+            animation: vinylSpin 6s linear infinite !important;
+        }
+        .vinyl-center-label {
+            width: 82px !important;
+            height: 82px !important;
+            border-radius: 50% !important;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%) !important;
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.5), inset 0 0 14px rgba(0, 0, 0, 0.45) !important;
+        }
+        .vinyl-tonearm {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            width: 60px;
+            height: 125px;
+            pointer-events: none;
+            transform-origin: 46px 14px;
+            transform: rotate(-35deg);
+            transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 10;
+        }
+        .vinyl-tonearm.active {
+            transform: rotate(8deg) !important;
+        }
+        .tonearm-pivot {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, #64748b 0%, #334155 100%);
+            border-radius: 50%;
+            border: 2px solid #94a3b8;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+        }
+        .tonearm-rod {
+            position: absolute;
+            top: 16px;
+            right: 15px;
+            width: 4px;
+            height: 95px;
+            background: linear-gradient(to right, #cbd5e1, #ffffff, #94a3b8);
+            border-radius: 2px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        }
+        .tonearm-head {
+            position: absolute;
+            bottom: 0;
+            right: 7px;
+            width: 16px;
+            height: 20px;
+            background: #0f172a;
+            border: 1px solid #34d399;
+            border-radius: 3px;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+        }
+        .btn-listen-live {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            font-weight: 700 !important;
+            font-size: 1.05rem !important;
+            font-family: 'Outfit', sans-serif !important;
+            letter-spacing: 0.5px !important;
+            min-height: 54px !important;
+            padding: 12px 34px !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 10px 30px -5px rgba(16, 185, 129, 0.5), 0 0 20px rgba(6, 182, 212, 0.3) !important;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            text-decoration: none !important;
+        }
+        .btn-listen-live:hover {
+            background: linear-gradient(135deg, #34d399 0%, #22d3ee 100%) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 16px 40px -4px rgba(16, 185, 129, 0.75), 0 0 30px rgba(6, 182, 212, 0.5) !important;
+            color: #ffffff !important;
+        }
+        .btn-listen-live:active {
+            transform: translateY(0) !important;
+        }
+        .btn-listen-live.playing {
+            background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+            box-shadow: 0 10px 30px -5px rgba(244, 63, 94, 0.55), 0 0 20px rgba(225, 29, 72, 0.35) !important;
+        }
+        .volume-control-pill {
+            background: rgba(15, 26, 48, 0.92) !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            padding: 6px 16px !important;
+            border-radius: 9999px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            height: 54px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+        }
+        .btn-request-nav {
+            background: rgba(16, 185, 129, 0.16) !important;
+            border: 1px solid rgba(16, 185, 129, 0.4) !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            font-size: 0.88rem !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-request-nav:hover {
+            background: rgba(16, 185, 129, 0.3) !important;
+            border-color: #34d399 !important;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4) !important;
+        }
+        .btn-admin-nav {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            color: #cbd5e1 !important;
+            font-weight: 500 !important;
+            font-size: 0.88rem !important;
+            transition: all 0.2s ease !important;
+            text-decoration: none !important;
+        }
+        .btn-admin-nav:hover {
+            background: rgba(255, 255, 255, 0.16) !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+            color: #ffffff !important;
+        }
+        .badge-on-air {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+        }
+        .schedule-card.active-slot {
+            border: 1.5px solid #10b981 !important;
+            background: rgba(16, 185, 129, 0.1) !important;
+            box-shadow: 0 0 35px rgba(16, 185, 129, 0.25) !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -61,11 +259,11 @@
                 </ul>
 
                 <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
-                    <button class="btn btn-outline-success btn-sm rounded-pill px-3 py-2 text-white border-opacity-50" data-bs-toggle="modal" data-bs-target="#songRequestModal">
+                    <button class="btn btn-request-nav rounded-pill px-3 py-2 text-white" data-bs-toggle="modal" data-bs-target="#songRequestModal">
                         <i class="bi bi-heart-fill text-danger me-1"></i> Request Lagu
                     </button>
-                    <a href="<?= base_url('admin') ?>" class="btn btn-dark btn-sm rounded-pill px-3 py-2 border border-secondary text-muted">
-                        <i class="bi bi-shield-lock me-1"></i> Studio Admin
+                    <a href="<?= base_url('admin') ?>" class="btn btn-admin-nav rounded-pill px-3 py-2 text-white">
+                        <i class="bi bi-shield-lock-fill text-primary me-1"></i> Studio Admin
                     </a>
                 </div>
             </div>
@@ -85,7 +283,7 @@
                             <div class="col-md-5 text-center">
                                 <div class="vinyl-stage">
                                     <div class="turntable-plinth">
-                                        <div class="vinyl-container">
+                                        <div class="turntable-platter">
                                             <div class="vinyl-disc" id="vinyl-disc" role="img" aria-label="Vinyl Turntable">
                                                 <div class="vinyl-center-label">
                                                     <div class="vinyl-spindle-hole"></div>
@@ -163,6 +361,12 @@
                                         <button type="button" class="btn-control-circle" data-bs-toggle="modal" data-bs-target="#tuneInModal" title="Aplikasi Eksternal" aria-label="Tune-in Options">
                                             <i class="bi bi-box-arrow-up-right fs-6"></i>
                                         </button>
+                                    </div>
+
+                                    <!-- Keyboard Shortcuts Info -->
+                                    <div class="w-100 d-none d-md-flex align-items-center gap-3 text-muted small mt-1">
+                                        <span><kbd class="bg-dark text-white border-secondary px-2 py-1 rounded">SPACE</kbd> Play / Pause</span>
+                                        <span><kbd class="bg-dark text-white border-secondary px-2 py-1 rounded">M</kbd> Mute / Unmute</span>
                                     </div>
                                 </div>
 
@@ -404,7 +608,7 @@
             <button class="btn-mini-play" id="btn-mini-play" type="button" aria-label="Play/Pause Stream">
                 <i class="bi bi-play-fill" id="mini-play-icon"></i>
             </button>
-            <button class="btn btn-outline-success btn-sm rounded-pill d-none d-md-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#songRequestModal">
+            <button class="btn btn-request-nav btn-sm rounded-pill d-none d-md-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#songRequestModal">
                 <i class="bi bi-heart-fill text-danger me-1"></i> Request
             </button>
         </div>

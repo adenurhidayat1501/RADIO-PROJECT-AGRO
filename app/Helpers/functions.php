@@ -80,11 +80,14 @@ if (!function_exists('base_url')) {
 }
 
 /**
- * Public asset URL generator
+ * Public asset URL generator with automatic cache-busting
  */
 if (!function_exists('asset')) {
     function asset(string $path): string {
-        return base_url('assets/' . ltrim($path, '/'));
+        $cleanPath = ltrim($path, '/');
+        $realFile = __DIR__ . '/../../public/assets/' . $cleanPath;
+        $ver = file_exists($realFile) ? filemtime($realFile) : '2.2.0';
+        return base_url('assets/' . $cleanPath) . '?v=' . $ver;
     }
 }
 
