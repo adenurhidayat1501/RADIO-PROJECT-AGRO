@@ -12,30 +12,36 @@ class StreamGeneratorService
     {
         $station = Station::getPrimary();
         $stream = $station['stream'] ?? [];
-        $mount = $customMount ?? ($stream['mountpoint'] ?? config('radio.icecast.mountpoint', '/live'));
-        $mount = '/' . ltrim($mount, '/');
+        $rawMount = $customMount ?? ($stream['mountpoint'] ?? config('radio.icecast.mountpoint', '/live'));
+        $mount = '/' . ltrim(trim((string) $rawMount), '/');
+        if ($mount === '/' || $mount === '/letsgo') {
+            $mount = '/live';
+        }
 
         $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
             || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
             || (isset($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))
             || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
 
+        // 1. If accessed through web server (e.g. https://radio.dadofy.xyz), use current host + proxy mount
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $scheme = $isHttps ? 'https' : 'http';
+            return "{$scheme}://{$_SERVER['HTTP_HOST']}{$mount}";
+        }
+
+        // 2. If an explicit external public URL is configured
         $publicUrl = config('radio.icecast.public_url');
-        // If an explicit external public URL is configured (not 127.0.0.1 or localhost):
         if (!empty($publicUrl)) {
             $parsed = parse_url($publicUrl);
             $host = $parsed['host'] ?? '';
+            if (str_ends_with($host, 'letsgo')) {
+                $host = substr($host, 0, -6);
+            }
             if (!empty($host) && $host !== '127.0.0.1' && $host !== 'localhost') {
                 $scheme = $parsed['scheme'] ?? ($isHttps ? 'https' : 'http');
                 $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
                 return "{$scheme}://{$host}{$port}{$mount}";
             }
-        }
-
-        // If accessed through web server (e.g. https://radio.dadofy.xyz), use current host + proxy mount
-        if (!empty($_SERVER['HTTP_HOST'])) {
-            $scheme = $isHttps ? 'https' : 'http';
-            return "{$scheme}://{$_SERVER['HTTP_HOST']}{$mount}";
         }
 
         return base_url(ltrim($mount, '/'));

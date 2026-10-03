@@ -126,9 +126,14 @@ class DiagnosticService
 
         try {
             $db = Database::getDatabase();
-            // Ping command to verify alive
-            $ping = $db->command(['ping' => 1]);
-            $isPingOk = isset($ping->toArray()[0]['ok']) && (float) $ping->toArray()[0]['ok'] === 1.0;
+            // Ping command to verify alive (read cursor via foreach to avoid rewind exception)
+            $cursor = $db->command(['ping' => 1]);
+            $pingDoc = null;
+            foreach ($cursor as $doc) {
+                $pingDoc = (array) $doc;
+                break;
+            }
+            $isPingOk = !empty($pingDoc['ok']);
 
             $checks[] = [
                 'key' => 'mongodb_connection',
@@ -204,7 +209,11 @@ class DiagnosticService
 
         $host = config('radio.icecast.host', '127.0.0.1');
         $port = (int) config('radio.icecast.port', 8000);
-        $mount = config('radio.icecast.mountpoint', '/live');
+        $rawMount = config('radio.icecast.mountpoint', '/live');
+        $mount = '/' . ltrim(trim((string) $rawMount), '/');
+        if ($mount === '/' || $mount === '/letsgo') {
+            $mount = '/live';
+        }
 
         // Check if port is open
         $fp = @fsockopen($host, $port, $errno, $errstr, 2);
@@ -386,7 +395,15 @@ class DiagnosticService
         // Check Music Directory
         if (is_dir($musicDir)) {
             $isWritable = is_writable($musicDir);
-            $scannedFiles = glob($musicDir . '/*.{mp3,wav,ogg,flac,m4a,aac}', GLOB_BRACE) ?: [];
+            $scannedFiles = [];
+            $entries = @scandir($musicDir) ?: [];
+            foreach ($entries as $e) {
+                if ($e === '.' || $e === '..') continue;
+                $ext = strtolower(pathinfo($e, PATHINFO_EXTENSION));
+                if (in_array($ext, ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'], true)) {
+                    $scannedFiles[] = $e;
+                }
+            }
             $totalAudio = count($scannedFiles);
 
             $status = $totalAudio > 0 ? 'ok' : 'warning';
@@ -516,6 +533,34 @@ class DiagnosticService
     public function runAutoRepair(): array
     {
         $results = [];
+
+        // 0. Sanitize .env configuration on VPS if it contains letsgo suffix
+        $envPath = __DIR__ . '/../../.env';
+        if (file_exists($envPath) && is_writable($envPath)) {
+            $envContent = (string) file_get_contents($envPath);
+            $cleanEnv = preg_replace('/ICECAST_PUBLIC_URL=[^\r\n]*letsgo[^\r\n]*/', 'ICECAST_PUBLIC_URL=https://radio.dadofy.xyz/live', $envContent);
+            $cleanEnv = preg_replace('/ICECAST_MOUNTPATH=letsgo/', 'ICECAST_MOUNTPATH=/live', $cleanEnv);
+            $cleanEnv = preg_replace('/APP_URL=[^\r\n]*letsgo[^\r\n]*/', 'APP_URL=https://radio.dadofy.xyz', $cleanEnv);
+            if ($cleanEnv !== $envContent) {
+                @file_put_contents($envPath, $cleanEnv);
+                $results[] = 'Konfigurasi .env (ICECAST_PUBLIC_URL & MOUNTPATH) dinormalisasi.';
+            }
+        }
+
+        // 0b. Sanitize Station mountpoint in MongoDB
+        try {
+            $station = Station::getPrimary();
+            if (!empty($station['_id'])) {
+                $stMount = $station['stream']['mountpoint'] ?? '';
+                if ($stMount === 'letsgo' || $stMount === '/letsgo' || empty($stMount)) {
+                    Station::getCollection()->updateOne(
+                        ['_id' => $station['_id']],
+                        ['$set' => ['stream.mountpoint' => '/live']]
+                    );
+                    $results[] = 'Mountpoint station di database dinormalisasi ke /live.';
+                }
+            }
+        } catch (\Throwable $e) {}
 
         // 1. Ensure storage directories exist
         $dirs = [

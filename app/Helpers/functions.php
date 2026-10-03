@@ -74,6 +74,9 @@ if (!function_exists('e')) {
 if (!function_exists('base_url')) {
     function base_url(string $path = ''): string {
         $baseUrl = rtrim((string) config('app.url', 'http://localhost'), '/');
+        if (str_ends_with($baseUrl, 'letsgo')) {
+            $baseUrl = rtrim(substr($baseUrl, 0, -6), '/');
+        }
         $path = ltrim($path, '/');
         return $path === '' ? $baseUrl : $baseUrl . '/' . $path;
     }

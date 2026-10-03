@@ -97,10 +97,15 @@ class LiquidsoapService
         // Direct storage folder scan: Ensure any uploaded audio in music dir is included
         $musicDir = config('radio.paths.music', '/var/lib/radio/music');
         if (is_dir($musicDir)) {
-            $scanned = glob($musicDir . '/*.{mp3,wav,ogg,flac,m4a,aac}', GLOB_BRACE) ?: [];
-            foreach ($scanned as $f) {
-                if (file_exists($f)) {
-                    $lines[] = $f;
+            $entries = @scandir($musicDir) ?: [];
+            foreach ($entries as $e) {
+                if ($e === '.' || $e === '..') continue;
+                $ext = strtolower(pathinfo($e, PATHINFO_EXTENSION));
+                if (in_array($ext, ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'], true)) {
+                    $fullPath = $musicDir . '/' . $e;
+                    if (file_exists($fullPath)) {
+                        $lines[] = $fullPath;
+                    }
                 }
             }
         }
@@ -165,7 +170,11 @@ class LiquidsoapService
         $station = Station::getPrimary();
         $stream = $station['stream'] ?? [];
 
-        $mount = $stream['mountpoint'] ?? config('radio.icecast.mountpoint', '/live');
+        $rawMount = $stream['mountpoint'] ?? config('radio.icecast.mountpoint', '/live');
+        $mount = '/' . ltrim(trim((string) $rawMount), '/');
+        if ($mount === '/' || $mount === '/letsgo') {
+            $mount = '/live';
+        }
         $bitrate = (int) ($stream['bitrate'] ?? config('radio.stream.bitrate', 128));
         $format = $stream['format'] ?? config('radio.stream.format', 'mp3');
 
@@ -256,6 +265,14 @@ autodj_playlist = playlist(
   "{$playlistsDirEsc}/default.m3u"
 )
 
+# Apply smooth crossfading on AutoDJ music tracks
+autodj_playlist = crossfade(
+  duration=3.0,
+  fade_in=2.0,
+  fade_out=2.0,
+  autodj_playlist
+)
+
 # Optional Jingle Rotation (1 jingle every 4 tracks if jingles.m3u has content)
 jingles_playlist = playlist(
   id="jingles",
@@ -290,16 +307,8 @@ radio_stream = fallback(
   [live_harbor, autodj_source, emergency_source]
 )
 
-# Apply metadata monitoring hook
-radio_stream = on_metadata(notify_metadata, radio_stream)
-
-# Apply Crossfade for AutoDJ tracks
-radio_stream = crossfade(
-  duration=3.0,
-  fade_in=2.0,
-  fade_out=2.0,
-  radio_stream
-)
+# Apply metadata monitoring hook (Liquidsoap 2.2 method call syntax)
+radio_stream.on_metadata(notify_metadata)
 
 # 8. Output to Icecast2 Server (mksafe guarantees infallible output stream)
 output.icecast(
