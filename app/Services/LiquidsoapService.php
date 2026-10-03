@@ -247,25 +247,11 @@ autodj_mixed = rotate(weights=[1, 4], [jingles_playlist, autodj_playlist])
 autodj_source = fallback(track_sensitive=false, [autodj_mixed, autodj_playlist, emergency_source])
 
 # 6. Live DJ Harbor Source (Accepts Icecast / Shoutcast connections from Mixxx, BUTT, OBS)
-# Validates both global harbor credentials and individual DJ accounts via API
-def harbor_auth(user, pass) =
-  if user == "{$harborUserEsc}" and pass == "{$harborPassEsc}" then
-    true
-  else
-    auth_resp = http.post(
-      headers=[("Content-Type", "application/x-www-form-urlencoded")],
-      data="user=" ^ url.encode(user) ^ "&password=" ^ url.encode(pass),
-      "{$apiUrlEsc}/api/internal/liquidsoap/auth-dj"
-    )
-    auth_resp.status_code == 200
-  end
-end
-
 live_harbor = input.harbor(
   id="live_dj",
   "{$harborMountEsc}",
   port={$harborPort},
-  auth=harbor_auth,
+  auth=fun(args) -> ((args.user == "{$harborUserEsc}" or args.user == "source" or args.user == "") and args.password == "{$harborPassEsc}"),
   on_connect=notify_live_connect,
   on_disconnect=notify_live_disconnect
 )
