@@ -20,7 +20,11 @@ class IcecastService
     {
         $this->host = config('radio.icecast.host', '127.0.0.1');
         $this->port = (int) config('radio.icecast.port', 8000);
-        $this->mountpoint = config('radio.icecast.mountpoint', '/live');
+        $rawMount = config('radio.icecast.mountpoint', '/live');
+        $this->mountpoint = '/' . ltrim(trim((string) $rawMount), '/');
+        if ($this->mountpoint === '/' || $this->mountpoint === '/letsgo') {
+            $this->mountpoint = '/live';
+        }
         $this->adminUser = config('radio.icecast.admin_user', 'admin');
         $this->adminPassword = config('radio.icecast.admin_password', 'hackme_admin');
     }
@@ -77,7 +81,7 @@ class IcecastService
         // Find our mountpoint
         foreach ($sources as $src) {
             $listenUrl = $src['listenurl'] ?? '';
-            if (str_ends_with($listenUrl, $this->mountpoint)) {
+            if (str_ends_with($listenUrl, $this->mountpoint) || str_ends_with($listenUrl, '/live')) {
                 $rawTitle = $src['title'] ?? ($src['yp_currently_playing'] ?? 'Radio Agro Live');
                 $parts = explode(' - ', $rawTitle, 2);
 
@@ -94,6 +98,27 @@ class IcecastService
                     'server_type' => $src['server_type'] ?? 'audio/mpeg',
                 ];
             }
+        }
+
+        // If exact mount not matched but Icecast has an active source, adopt the active source
+        if (!empty($sources) && isset($sources[0]['listenurl'])) {
+            $src = $sources[0];
+            $rawTitle = $src['title'] ?? ($src['yp_currently_playing'] ?? 'Radio Agro Live');
+            $parts = explode(' - ', $rawTitle, 2);
+            $parsedPath = parse_url($src['listenurl'], PHP_URL_PATH) ?: $this->mountpoint;
+
+            return [
+                'online' => true,
+                'server_online' => true,
+                'listeners' => (int) ($src['listeners'] ?? 0),
+                'peak' => (int) ($src['listener_peak'] ?? 0),
+                'bitrate' => (int) ($src['bitrate'] ?? config('radio.stream.bitrate', 128)),
+                'title' => count($parts) === 2 ? trim($parts[1]) : trim($rawTitle),
+                'artist' => count($parts) === 2 ? trim($parts[0]) : 'Radio Agro',
+                'genre' => $src['genre'] ?? config('radio.station.genre', 'Various'),
+                'mount' => $parsedPath,
+                'server_type' => $src['server_type'] ?? 'audio/mpeg',
+            ];
         }
 
         return $defaultState;

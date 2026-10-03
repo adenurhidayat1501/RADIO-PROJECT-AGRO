@@ -108,12 +108,24 @@ $logs = $report['logs'];
 $hasLogErrors = false;
 
 if (!empty($logs['liquidsoap'])) {
-    $errLines = array_filter($logs['liquidsoap'], fn($l) => stripos($l, 'error') !== false || stripos($l, 'fatal') !== false || stripos($l, 'exception') !== false);
+    $errLines = array_filter($logs['liquidsoap'], fn($l) => stripos($l, 'error') !== false || stripos($l, 'fatal') !== false || stripos($l, 'failed') !== false || stripos($l, 'refused') !== false || stripos($l, '401') !== false);
     if (!empty($errLines)) {
         $hasLogErrors = true;
-        echo "{$C_YELLOW}>>> Baris Error Terkini di Liquidsoap Log (/var/log/radio/liquidsoap.log):{$C_RESET}\n";
+        echo "{$C_YELLOW}>>> Baris Error/Peringatan Terkini di Liquidsoap Log (/var/log/radio/liquidsoap.log):{$C_RESET}\n";
         foreach (array_slice($errLines, -5) as $el) {
-            echo "  {$C_RED}• {$el}{$C_RESET}\n";
+            echo "  {$C_RED}• " . trim($el) . "{$C_RESET}\n";
+        }
+        echo "\n";
+    }
+}
+
+if (!empty($logs['icecast'])) {
+    $iceErrLines = array_filter($logs['icecast'], fn($l) => stripos($l, 'warn') !== false || stripos($l, 'error') !== false || stripos($l, 'auth') !== false || stripos($l, 'bad') !== false);
+    if (!empty($iceErrLines)) {
+        $hasLogErrors = true;
+        echo "{$C_YELLOW}>>> Baris Peringatan/Error Terkini di Icecast Log (/var/log/icecast2/error.log):{$C_RESET}\n";
+        foreach (array_slice($iceErrLines, -5) as $el) {
+            echo "  {$C_RED}• " . trim($el) . "{$C_RESET}\n";
         }
         echo "\n";
     }
@@ -125,7 +137,7 @@ if (!empty($logs['nginx_error'])) {
         $hasLogErrors = true;
         echo "{$C_YELLOW}>>> Baris Error Terkini di Nginx Error Log (/var/log/nginx/radio_error.log):{$C_RESET}\n";
         foreach (array_slice($errLines, -5) as $el) {
-            echo "  {$C_RED}• {$el}{$C_RESET}\n";
+            echo "  {$C_RED}• " . trim($el) . "{$C_RESET}\n";
         }
         echo "\n";
     }

@@ -239,6 +239,35 @@ class DiagnosticService
             'remedy' => null,
         ];
 
+        // Verify Icecast source password synchronization
+        $iceXmlPaths = ['/etc/icecast2/icecast.xml', '/etc/icecast/icecast.xml'];
+        $xmlSourcePass = null;
+        $xmlMount = null;
+        foreach ($iceXmlPaths as $xp) {
+            if (file_exists($xp) && is_readable($xp)) {
+                $xml = (string) @file_get_contents($xp);
+                if (preg_match('/<source-password>(.*?)<\/source-password>/s', $xml, $m)) {
+                    $xmlSourcePass = trim($m[1]);
+                }
+                if (preg_match('/<mount-name>(.*?)<\/mount-name>/s', $xml, $m)) {
+                    $xmlMount = trim($m[1]);
+                }
+                break;
+            }
+        }
+
+        $envSourcePass = config('radio.icecast.source_password', 'hackme_source');
+        if ($xmlSourcePass !== null && $xmlSourcePass !== $envSourcePass) {
+            $checks[] = [
+                'key' => 'icecast_auth_mismatch',
+                'category' => 'Broadcast Engine',
+                'name' => 'Sinkronisasi Password Icecast Source',
+                'status' => 'error',
+                'message' => "Password sumber di .env TIDAK COCOK dengan <source-password> di /etc/icecast2/icecast.xml. Liquidsoap ditolak Icecast (HTTP 401 Unauthorized).",
+                'remedy' => 'Jalankan: php scripts/diagnose.php --repair untuk sinkronisasi otomatis.',
+            ];
+        }
+
         // Check status-json.xsl
         $icecastService = new IcecastService();
         $status = $icecastService->getStatus();
@@ -264,13 +293,27 @@ class DiagnosticService
                     'remedy' => null,
                 ];
             } else {
+                $liqService = new LiquidsoapService();
+                $outStatus = trim($liqService->sendTelnet('output_icecast.status'));
+                $logHint = '';
+                if (file_exists('/var/log/radio/liquidsoap.log')) {
+                    $lastLines = @file('/var/log/radio/liquidsoap.log') ?: [];
+                    foreach (array_reverse(array_slice($lastLines, -50)) as $ll) {
+                        if (stripos($ll, 'output_icecast') !== false || stripos($ll, 'failed') !== false || stripos($ll, '401') !== false || stripos($ll, 'refused') !== false) {
+                            $logHint = ' Log: ' . trim($ll);
+                            break;
+                        }
+                    }
+                }
+                $extra = ($outStatus && !str_contains($outStatus, 'ERROR')) ? " [Telnet Output: {$outStatus}.{$logHint}]" : ($logHint ? " [{$logHint}]" : '');
+
                 $checks[] = [
                     'key' => 'icecast_mountpoint',
                     'category' => 'Broadcast Engine',
                     'name' => "Mountpoint Siaran ({$mount})",
                     'status' => 'error',
-                    'message' => "Icecast berjalan tetapi mountpoint '{$mount}' belum menerima input stream audio dari Liquidsoap.",
-                    'remedy' => 'Restart Liquidsoap: sudo systemctl restart radio-liquidsoap',
+                    'message' => "Icecast berjalan tetapi mountpoint '{$mount}' belum menerima input stream audio dari Liquidsoap.{$extra}",
+                    'remedy' => 'Jalankan auto-repair: php scripts/diagnose.php --repair',
                 ];
             }
         } else {
@@ -359,13 +402,17 @@ class DiagnosticService
             ];
 
             // Test AutoDJ status via Telnet
-            $autodjRes = $liqService->sendTelnet('autodj.status');
+            $autodjRes = $liqService->sendTelnet('output_icecast.status');
+            $tracksRemaining = $liqService->sendTelnet('autodj.remaining');
+            $statusDesc = (trim($autodjRes) === 'on') ? 'ON (Mengudara)' : (trim($autodjRes) ?: 'siap');
+            $remCount = is_numeric(trim($tracksRemaining)) ? trim($tracksRemaining) . ' lagu' : 'tersedia';
+
             $checks[] = [
                 'key' => 'liquidsoap_autodj_status',
                 'category' => 'Auto DJ',
-                'name' => 'Status Antrean AutoDJ',
+                'name' => 'Status Transmisi & AutoDJ Telnet',
                 'status' => 'ok',
-                'message' => "Status AutoDJ: " . (trim($autodjRes) ?: 'ready/playing'),
+                'message' => "Output Icecast: {$statusDesc} | Antrean AutoDJ: {$remCount}.",
                 'remedy' => null,
             ];
         }
@@ -549,16 +596,50 @@ class DiagnosticService
     {
         $results = [];
 
-        // 0. Sanitize .env configuration on VPS if it contains letsgo suffix
+        // 0. Synchronize Icecast XML credentials & .env
         $envPath = __DIR__ . '/../../.env';
+        $iceXmlPath = file_exists('/etc/icecast2/icecast.xml') ? '/etc/icecast2/icecast.xml' : '/etc/icecast/icecast.xml';
+
+        $xmlSourcePass = null;
+        $xmlAdminPass = null;
+        if (file_exists($iceXmlPath) && is_readable($iceXmlPath)) {
+            $xmlContent = (string) file_get_contents($iceXmlPath);
+            if (preg_match('/<source-password>(.*?)<\/source-password>/s', $xmlContent, $m)) {
+                $xmlSourcePass = trim($m[1]);
+            }
+            if (preg_match('/<admin-password>(.*?)<\/admin-password>/s', $xmlContent, $m)) {
+                $xmlAdminPass = trim($m[1]);
+            }
+
+            // Also check if icecast.xml has /letsgo and fix it to /live
+            if (str_contains($xmlContent, '<mount-name>/letsgo</mount-name>')) {
+                $fixedXml = str_replace('<mount-name>/letsgo</mount-name>', '<mount-name>/live</mount-name>', $xmlContent);
+                @file_put_contents($iceXmlPath, $fixedXml);
+                @shell_exec('systemctl restart icecast2 2>&1');
+                $results[] = 'Mountpoint di /etc/icecast2/icecast.xml diperbaiki menjadi /live dan Icecast2 direstart.';
+            }
+        }
+
         if (file_exists($envPath) && is_writable($envPath)) {
             $envContent = (string) file_get_contents($envPath);
-            $cleanEnv = preg_replace('/ICECAST_PUBLIC_URL=[^\r\n]*letsgo[^\r\n]*/', 'ICECAST_PUBLIC_URL=https://radio.dadofy.xyz/live', $envContent);
-            $cleanEnv = preg_replace('/ICECAST_MOUNTPATH=letsgo/', 'ICECAST_MOUNTPATH=/live', $cleanEnv);
-            $cleanEnv = preg_replace('/APP_URL=[^\r\n]*letsgo[^\r\n]*/', 'APP_URL=https://radio.dadofy.xyz', $cleanEnv);
+            $cleanEnv = preg_replace('/ICECAST_PUBLIC_URL=[^\r\n]*/', 'ICECAST_PUBLIC_URL=https://radio.dadofy.xyz/live', $envContent);
+            $cleanEnv = preg_replace('/ICECAST_MOUNTPATH=[^\r\n]*/', 'ICECAST_MOUNTPATH=/live', $cleanEnv);
+            $cleanEnv = preg_replace('/APP_URL=[^\r\n]*/', 'APP_URL=https://radio.dadofy.xyz', $cleanEnv);
+
+            if (!empty($xmlSourcePass)) {
+                $cleanEnv = preg_replace('/ICECAST_SOURCE_PASSWORD=[^\r\n]*/', 'ICECAST_SOURCE_PASSWORD=' . $xmlSourcePass, $cleanEnv);
+                putenv('ICECAST_SOURCE_PASSWORD=' . $xmlSourcePass);
+                $_ENV['ICECAST_SOURCE_PASSWORD'] = $xmlSourcePass;
+            }
+            if (!empty($xmlAdminPass)) {
+                $cleanEnv = preg_replace('/ICECAST_ADMIN_PASSWORD=[^\r\n]*/', 'ICECAST_ADMIN_PASSWORD=' . $xmlAdminPass, $cleanEnv);
+                putenv('ICECAST_ADMIN_PASSWORD=' . $xmlAdminPass);
+                $_ENV['ICECAST_ADMIN_PASSWORD'] = $xmlAdminPass;
+            }
+
             if ($cleanEnv !== $envContent) {
                 @file_put_contents($envPath, $cleanEnv);
-                $results[] = 'Konfigurasi .env (ICECAST_PUBLIC_URL & MOUNTPATH) dinormalisasi.';
+                $results[] = 'Konfigurasi .env (kredensial Icecast, URL siaran, & mountpoint) disinkronkan.';
             }
         }
 
@@ -615,12 +696,13 @@ class DiagnosticService
 
         // 5. Restart daemon directly (as root or with sudo)
         @shell_exec('systemctl restart radio-liquidsoap 2>&1 || sudo systemctl restart radio-liquidsoap 2>&1');
-        sleep(1);
+        sleep(2);
 
-        // 6. Send instant Telnet reload & skip
+        // 6. Send instant Telnet start & reload
+        $liqService->sendTelnet('output_icecast.start');
         $reloadRes = $liqService->sendTelnet('autodj.reload');
-        $skipRes = $liqService->sendTelnet('autodj.skip');
-        $results[] = "Layanan radio-liquidsoap direstart (telnet status: reload={$reloadRes}, skip={$skipRes}).";
+        $outStatus = trim($liqService->sendTelnet('output_icecast.status'));
+        $results[] = "Layanan radio-liquidsoap direstart (Status output stream Icecast: {$outStatus}).";
 
         return [
             'success' => true,
