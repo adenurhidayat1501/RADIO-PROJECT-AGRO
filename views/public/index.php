@@ -84,19 +84,27 @@
                             <!-- Vinyl Deck & Spectrum Visualizer -->
                             <div class="col-md-5 text-center">
                                 <div class="vinyl-stage">
-                                    <div class="vinyl-container">
-                                        <div class="vinyl-disc" id="vinyl-disc" role="img" aria-label="Vinyl Turntable">
-                                            <div class="vinyl-center-label">
-                                                <div class="vinyl-spindle-hole"></div>
-                                                <i class="bi bi-soundwave fs-2"></i>
-                                                <small class="font-outfit fw-bold" style="font-size: 0.65rem; letter-spacing: 0.5px;">AGRO LIVE</small>
+                                    <div class="turntable-plinth">
+                                        <div class="vinyl-container">
+                                            <div class="vinyl-disc" id="vinyl-disc" role="img" aria-label="Vinyl Turntable">
+                                                <div class="vinyl-center-label">
+                                                    <div class="vinyl-spindle-hole"></div>
+                                                    <i class="bi bi-soundwave fs-2"></i>
+                                                    <small class="font-outfit fw-bold" style="font-size: 0.65rem; letter-spacing: 0.5px;">AGRO LIVE</small>
+                                                </div>
                                             </div>
+                                        </div>
+                                        <!-- Realistic Stylus Tonearm -->
+                                        <div class="vinyl-tonearm" id="vinyl-tonearm" aria-hidden="true">
+                                            <div class="tonearm-pivot"></div>
+                                            <div class="tonearm-rod"></div>
+                                            <div class="tonearm-head"></div>
                                         </div>
                                     </div>
 
                                     <!-- Canvas Audio Visualizer -->
                                     <div class="visualizer-wrapper">
-                                        <canvas id="audio-visualizer" width="260" height="48"></canvas>
+                                        <canvas id="audio-visualizer" width="270" height="52" aria-label="Live Frequency Spectrum"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -149,10 +157,10 @@
 
                                     <!-- Share / Tune In Options -->
                                     <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-copy-stream" style="width: 44px; height: 44px;" title="Salin URL Stream" aria-label="Copy Stream URL">
+                                        <button type="button" class="btn-control-circle" id="btn-copy-stream" title="Salin URL Stream" aria-label="Copy Stream URL">
                                             <i class="bi bi-link-45deg fs-5"></i>
                                         </button>
-                                        <button type="button" class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" data-bs-toggle="modal" data-bs-target="#tuneInModal" style="width: 44px; height: 44px;" title="Aplikasi Eksternal" aria-label="Tune-in Options">
+                                        <button type="button" class="btn-control-circle" data-bs-toggle="modal" data-bs-target="#tuneInModal" title="Aplikasi Eksternal" aria-label="Tune-in Options">
                                             <i class="bi bi-box-arrow-up-right fs-6"></i>
                                         </button>
                                     </div>

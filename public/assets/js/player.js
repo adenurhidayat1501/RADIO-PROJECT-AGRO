@@ -35,6 +35,7 @@
         const miniArtist = document.getElementById('mini-np-artist');
 
         const vinylDisc = document.getElementById('vinyl-disc');
+        const vinylTonearm = document.getElementById('vinyl-tonearm');
         const volumeSlider = document.getElementById('volume-slider');
         const volumeIconBtn = document.getElementById('volume-icon-btn');
         const volumeIcon = document.getElementById('volume-icon');
@@ -225,6 +226,7 @@
                     miniPlayIcon.className = 'bi bi-stop-fill';
                 }
                 if (vinylDisc) vinylDisc.classList.add('spinning');
+                if (vinylTonearm) vinylTonearm.classList.add('active');
                 if (miniThumb) miniThumb.classList.add('spinning');
             } else {
                 if (playBtn) {
@@ -237,12 +239,28 @@
                     miniPlayIcon.className = 'bi bi-play-fill';
                 }
                 if (vinylDisc) vinylDisc.classList.remove('spinning');
+                if (vinylTonearm) vinylTonearm.classList.remove('active');
                 if (miniThumb) miniThumb.classList.remove('spinning');
             }
         }
 
         if (playBtn) playBtn.addEventListener('click', togglePlayback);
         if (miniPlayBtn) miniPlayBtn.addEventListener('click', togglePlayback);
+
+        // Keyboard Shortcuts (Space to Play/Pause, M to Mute)
+        document.addEventListener('keydown', function (e) {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+                return;
+            }
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlayback();
+            } else if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                if (volumeIconBtn) volumeIconBtn.click();
+            }
+        });
 
         // ----------------------------------------------------------------------
         // 4. Volume Controller & Persistence

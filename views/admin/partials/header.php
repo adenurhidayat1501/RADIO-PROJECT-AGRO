@@ -37,10 +37,10 @@
             <ul class="navbar-nav ms-auto align-items-center">
                 <!-- Audio Player Quick Bar -->
                 <li class="nav-item me-3 d-none d-lg-block">
-                    <div class="d-flex align-items-center bg-dark text-white px-3 py-1 rounded-pill shadow-sm">
+                    <div class="d-flex align-items-center nav-live-bar">
                         <span class="badge bg-danger pulse-dot me-2">● LIVE</span>
                         <span id="nav-now-playing" class="small text-truncate me-3" style="max-width: 250px;">Loading stream...</span>
-                        <button id="nav-play-btn" class="btn btn-sm btn-outline-light rounded-circle p-1" style="width:28px;height:28px;" title="Listen Live">
+                        <button id="nav-play-btn" class="btn btn-sm btn-outline-success rounded-circle p-1 text-white" style="width:28px;height:28px;" title="Listen Live">
                             <i class="bi bi-play-fill"></i>
                         </button>
                     </div>

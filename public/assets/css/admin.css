@@ -1,87 +1,190 @@
-/* Radio Platform AdminLTE 4 Polish - Powered by .agents Design Standards */
+/* ==========================================================================
+   RADIO AGRO - ADMIN CONSOLE DESIGN SYSTEM
+   Standard: .agents (design-system, ui-styling, ui-ux-pro-max, brand)
+   Three-Layer Design Tokens for AdminLTE 4 & Control Panels
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. THREE-LAYER DESIGN TOKENS
+   -------------------------------------------------------------------------- */
 :root {
-    --primary-color: #10b981;
-    --primary-hover: #059669;
-    --accent-cyan: #06b6d4;
-    --bg-dark-sidebar: #0b1324;
+    /* Primitive Tokens: Color Palette */
+    --adm-obsidian-950: #04070d;
+    --adm-obsidian-900: #070c17;
+    --adm-obsidian-850: #0b1324;
+    --adm-obsidian-800: #0f1a30;
+    --adm-obsidian-750: #15223c;
+
+    --adm-emerald-400: #34d399;
+    --adm-emerald-500: #10b981;
+    --adm-emerald-600: #059669;
+
+    --adm-cyan-400: #22d3ee;
+    --adm-cyan-500: #06b6d4;
+    --adm-cyan-600: #0891b2;
+
+    --adm-rose-500: #f43f5e;
+    --adm-rose-600: #e11d48;
+
+    /* Semantic Tokens */
+    --adm-primary: var(--adm-emerald-500);
+    --adm-primary-hover: var(--adm-emerald-600);
+    --adm-primary-glow: rgba(16, 185, 129, 0.35);
+
+    --adm-accent: var(--adm-cyan-500);
+    --adm-accent-hover: var(--adm-cyan-600);
+
+    --adm-bg-sidebar: var(--adm-obsidian-900);
+    --adm-bg-sidebar-hover: rgba(255, 255, 255, 0.06);
+    --adm-border-subtle: rgba(0, 0, 0, 0.08);
+    --adm-border-dark: rgba(255, 255, 255, 0.08);
+
+    --adm-gradient-primary: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --adm-gradient-sidebar-active: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(6, 182, 212, 0.12) 100%);
+
+    /* Component Tokens */
+    --adm-card-radius: 14px;
+    --adm-btn-radius: 8px;
+    --adm-focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.28);
 }
 
+/* --------------------------------------------------------------------------
+   2. GLOBAL TYPOGRAPHY & RESET
+   -------------------------------------------------------------------------- */
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6, .brand-text {
+h1, h2, h3, h4, h5, h6, .brand-text, .app-content-header h3 {
     font-family: 'Outfit', 'Inter', sans-serif;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.3px;
 }
 
-/* Sidebar Branding & Active Indicator */
+/* --------------------------------------------------------------------------
+   3. SIDEBAR BRANDING & NAVIGATION
+   -------------------------------------------------------------------------- */
 .app-sidebar {
-    background-color: var(--bg-dark-sidebar) !important;
+    background-color: var(--adm-bg-sidebar) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 .sidebar-brand {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 1rem 1.25rem;
+}
+
+.sidebar-brand .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #ffffff !important;
+}
+
+.sidebar-brand .brand-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .sidebar-menu .nav-link {
     border-radius: 8px;
-    margin: 2px 10px;
-    transition: all 0.2s ease;
-}
-
-.sidebar-menu .nav-link.active {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.15)) !important;
-    color: #ffffff !important;
-    border-left: 3px solid #10b981;
-    font-weight: 600;
+    margin: 3px 12px;
+    padding: 9px 14px;
+    font-weight: 500;
+    font-size: 0.92rem;
+    color: #94a3b8 !important;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
 .sidebar-menu .nav-link:hover:not(.active) {
-    background: rgba(255, 255, 255, 0.06);
-    color: #f8fafc;
+    background: var(--adm-bg-sidebar-hover);
+    color: #ffffff !important;
+    transform: translateX(2px);
 }
 
-.avatar-circle {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+.sidebar-menu .nav-link.active {
+    background: var(--adm-gradient-sidebar-active) !important;
+    color: #ffffff !important;
+    border-left: 3.5px solid var(--adm-emerald-400);
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-menu .nav-link.active .nav-icon {
+    color: var(--adm-emerald-400) !important;
+}
+
+.nav-header {
+    letter-spacing: 0.8px;
+    font-size: 0.72rem;
+    padding: 12px 18px 4px !important;
+    color: #64748b !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. TOP NAVBAR & QUICK AUDIO MONITOR
+   -------------------------------------------------------------------------- */
+.app-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    backdrop-filter: blur(12px);
+}
+
+.nav-live-bar {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .pulse-dot {
-    animation: pulse 1.5s infinite;
+    animation: livePulseDot 1.5s infinite;
 }
 
-@keyframes pulse {
+@keyframes livePulseDot {
     0% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.4; transform: scale(0.95); }
     100% { opacity: 1; transform: scale(1); }
 }
 
+.avatar-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: var(--adm-gradient-primary);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   5. CARDS & ELEVATED PANELS
+   -------------------------------------------------------------------------- */
 .card {
-    border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-radius: var(--adm-card-radius);
+    border: 1px solid var(--adm-border-subtle);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 
-.table th {
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.72rem;
-    letter-spacing: 0.6px;
-    color: #64748b;
-    border-bottom: 2px solid #e2e8f0;
+.card:hover {
+    border-color: rgba(0, 0, 0, 0.12);
 }
 
-.table td {
-    vertical-align: middle;
+.card-header {
+    border-bottom: 1px solid var(--adm-border-subtle);
+    padding: 1rem 1.25rem;
 }
 
 .stat-card-icon {
@@ -91,10 +194,85 @@ h1, h2, h3, h4, h5, h6, .brand-text {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 26px;
+    font-size: 24px;
     box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s ease;
 }
 
+.card:hover .stat-card-icon {
+    transform: scale(1.06);
+}
+
+/* --------------------------------------------------------------------------
+   6. TABLES & DATA LISTS
+   -------------------------------------------------------------------------- */
+.table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.6px;
+    color: #64748b;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 12px 16px;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 12px 16px;
+}
+
+.table tbody tr {
+    transition: background 0.15s ease;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(16, 185, 129, 0.04) !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. FORM INPUTS & INTERACTIVE CONTROLS
+   -------------------------------------------------------------------------- */
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 9px 14px;
+    font-size: 0.95rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--adm-emerald-500);
+    box-shadow: var(--adm-focus-ring);
+}
+
+.btn-primary {
+    background: var(--adm-gradient-primary);
+    border: none;
+    border-radius: var(--adm-btn-radius);
+    padding: 8px 18px;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.45);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-primary:focus-visible {
+    outline: none;
+    box-shadow: var(--adm-focus-ring);
+}
+
+/* --------------------------------------------------------------------------
+   8. HELPERS & ANIMATIONS
+   -------------------------------------------------------------------------- */
 .cursor-grab {
     cursor: grab;
     user-select: none;
@@ -104,7 +282,6 @@ h1, h2, h3, h4, h5, h6, .brand-text {
     cursor: grabbing;
 }
 
-/* Spinner helper */
 .spin {
     display: inline-block;
     animation: rotateSpin 1s linear infinite;
