@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Helpers\Logger;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
 
 class BackupService
 {
@@ -24,7 +26,7 @@ class BackupService
         $dbName = config('database.database', 'radio_platform');
         $mongoUri = config('database.uri', 'mongodb://127.0.0.1:27017');
 
-        // mongodump command excluding heavy binary data (songs filepaths are saved, but audio files are not cloned)
+        // mongodump command excluding heavy audio binary files
         $dumpCmd = sprintf(
             'mongodump --uri=%s --db=%s --out=%s 2>&1',
             escapeshellarg($mongoUri),
@@ -43,21 +45,22 @@ class BackupService
             );
             @shell_exec($tarCmd);
 
-            // Clean up temp dir
-            @shell_exec('rm -rf ' . escapeshellarg($tempDumpDir));
+            self::deleteDirectory($tempDumpDir);
 
-            Logger::info("Backup created successfully: {$filename}");
+            if (file_exists($archivePath) && filesize($archivePath) > 0) {
+                Logger::info("Backup created successfully: {$filename}");
 
-            return [
-                'success' => true,
-                'filename' => $filename,
-                'path' => $archivePath,
-                'size' => file_exists($archivePath) ? filesize($archivePath) : 0,
-                'created_at' => date('Y-m-d H:i:s'),
-            ];
+                return [
+                    'success' => true,
+                    'filename' => $filename,
+                    'path' => $archivePath,
+                    'size' => filesize($archivePath),
+                    'created_at' => date('Y-m-d H:i:s'),
+                ];
+            }
         }
 
-        // Fallback for Windows development or if mongodump CLI is not installed: JSON dumps of collections
+        // Fallback: JSON dumps of collections
         return self::createJsonFallbackBackup($filename, $archivePath);
     }
 
@@ -74,10 +77,14 @@ class BackupService
             $export = [];
             foreach ($collections as $col) {
                 $cursor = $db->selectCollection($col)->find();
-                $export[$col] = iterator_to_array($cursor);
+                $docs = [];
+                foreach ($cursor as $doc) {
+                    $docs[] = self::encodeDocForExport((array) $doc);
+                }
+                $export[$col] = $docs;
             }
 
-            $jsonContent = json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $jsonContent = json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             $jsonFile = str_replace('.tar.gz', '.json', $archivePath);
             file_put_contents($jsonFile, $jsonContent);
 
@@ -130,23 +137,29 @@ class BackupService
         $dbName = config('database.database', 'radio_platform');
         $mongoUri = config('database.uri', 'mongodb://127.0.0.1:27017');
 
-        if (str_ends_with($filePath, '.tar.gz')) {
-            $tempDir = self::$backupDir . '/restore_temp';
+        // Check if archive is .tar.gz or ends with .gz / .tar
+        if (str_ends_with($filePath, '.tar.gz') || str_ends_with($filePath, '.gz') || str_ends_with($filePath, '.tar')) {
+            $tempDir = self::$backupDir . '/restore_temp_' . time();
             @mkdir($tempDir, 0755, true);
-            shell_exec(sprintf('tar -xzf %s -C %s', escapeshellarg($filePath), escapeshellarg($tempDir)));
+            shell_exec(sprintf('tar -xzf %s -C %s 2>&1', escapeshellarg($filePath), escapeshellarg($tempDir)));
+
+            // Check if dump was nested in dbName subfolder or root
+            $restoreSource = is_dir($tempDir . '/' . $dbName) ? ($tempDir . '/' . $dbName) : $tempDir;
 
             $cmd = sprintf(
-                'mongorestore --uri=%s --db=%s --drop %s/%s 2>&1',
+                'mongorestore --uri=%s --db=%s --drop %s 2>&1',
                 escapeshellarg($mongoUri),
                 escapeshellarg($dbName),
-                escapeshellarg($tempDir),
-                escapeshellarg($dbName)
+                escapeshellarg($restoreSource)
             );
             $output = shell_exec($cmd);
-            shell_exec('rm -rf ' . escapeshellarg($tempDir));
+            self::deleteDirectory($tempDir);
+
+            Logger::info("Database restored from archive: {$filePath}");
             return true;
         }
 
+        // Check if JSON backup
         if (str_ends_with($filePath, '.json')) {
             $content = file_get_contents($filePath);
             $data = json_decode($content, true);
@@ -154,15 +167,70 @@ class BackupService
 
             $db = Database::getDatabase();
             foreach ($data as $col => $docs) {
-                if (!empty($docs)) {
+                if (!empty($docs) && is_array($docs)) {
                     $collection = $db->selectCollection($col);
                     $collection->drop();
-                    $collection->insertMany($docs);
+                    $preparedDocs = [];
+                    foreach ($docs as $doc) {
+                        $preparedDocs[] = self::decodeDocForImport((array) $doc);
+                    }
+                    if (!empty($preparedDocs)) {
+                        $collection->insertMany($preparedDocs);
+                    }
                 }
             }
+
+            Logger::info("Database restored from JSON backup: {$filePath}");
             return true;
         }
 
         return false;
+    }
+
+    private static function encodeDocForExport(array $doc): array
+    {
+        foreach ($doc as $k => $v) {
+            if ($v instanceof ObjectId) {
+                $doc[$k] = ['$oid' => (string) $v];
+            } elseif ($v instanceof UTCDateTime) {
+                $doc[$k] = ['$date' => (string) $v];
+            } elseif (is_array($v)) {
+                $doc[$k] = self::encodeDocForExport($v);
+            }
+        }
+        return $doc;
+    }
+
+    private static function decodeDocForImport(array $doc): array
+    {
+        foreach ($doc as $k => $v) {
+            if (is_array($v)) {
+                if (isset($v['$oid']) && is_string($v['$oid']) && strlen($v['$oid']) === 24) {
+                    $doc[$k] = new ObjectId($v['$oid']);
+                } elseif (isset($v['$date'])) {
+                    $doc[$k] = new UTCDateTime(is_numeric($v['$date']) ? (int) $v['$date'] : (int)(strtotime((string)$v['$date']) * 1000));
+                } else {
+                    $doc[$k] = self::decodeDocForImport($v);
+                }
+            }
+        }
+        return $doc;
+    }
+
+    private static function deleteDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) return;
+        $items = scandir($dir);
+        if ($items === false) return;
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') continue;
+            $path = $dir . DIRECTORY_SEPARATOR . $item;
+            if (is_dir($path)) {
+                self::deleteDirectory($path);
+            } else {
+                @unlink($path);
+            }
+        }
+        @rmdir($dir);
     }
 }

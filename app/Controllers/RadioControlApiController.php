@@ -77,8 +77,11 @@ class RadioControlApiController extends BaseController
      */
     public function onTrack(): void
     {
-        $artist = trim((string) ($_GET['artist'] ?? ($_POST['artist'] ?? '')));
-        $title = trim((string) ($_GET['title'] ?? ($_POST['title'] ?? '')));
+        $raw = file_get_contents('php://input');
+        $json = json_decode($raw, true) ?? [];
+
+        $artist = trim((string) ($_GET['artist'] ?? ($_POST['artist'] ?? ($json['artist'] ?? ''))));
+        $title = trim((string) ($_GET['title'] ?? ($_POST['title'] ?? ($json['title'] ?? ''))));
 
         if (!empty($title)) {
             // Find song in library to increment play_count and get album
@@ -110,7 +113,7 @@ class RadioControlApiController extends BaseController
     }
 
     /**
-     * GET /api/internal/liquidsoap/on-live-connect
+     * GET/POST /api/internal/liquidsoap/on-live-connect
      */
     public function onLiveConnect(): void
     {
@@ -127,7 +130,7 @@ class RadioControlApiController extends BaseController
     }
 
     /**
-     * GET /api/internal/liquidsoap/on-live-disconnect
+     * GET/POST /api/internal/liquidsoap/on-live-disconnect
      */
     public function onLiveDisconnect(): void
     {
@@ -140,5 +143,35 @@ class RadioControlApiController extends BaseController
         RadioEvent::logEvent('live_stopped', 'harbor');
 
         $this->json(['success' => true]);
+    }
+
+    /**
+     * POST/GET /api/internal/liquidsoap/auth-dj
+     * Authenticates incoming Harbor DJ streams
+     */
+    public function authDj(): void
+    {
+        $raw = file_get_contents('php://input');
+        $json = json_decode($raw, true) ?? [];
+
+        $user = trim((string) ($_POST['user'] ?? ($json['user'] ?? ($_GET['user'] ?? ''))));
+        $pass = trim((string) ($_POST['password'] ?? ($json['password'] ?? ($_GET['password'] ?? ''))));
+
+        $harborUser = (string) config('radio.liquidsoap.harbor_user', 'source');
+        $harborPass = (string) config('radio.liquidsoap.harbor_password', 'dj_live_harbor_pass');
+
+        // Check global harbor fallback
+        if ($user === $harborUser && $pass === $harborPass) {
+            $this->json(['success' => true, 'authenticated' => true, 'dj' => $user]);
+            return;
+        }
+
+        // Check individual DJ accounts in MongoDB
+        if (!empty($user) && !empty($pass) && \App\Models\DjAccount::verifyPassword($user, $pass)) {
+            $this->json(['success' => true, 'authenticated' => true, 'dj' => $user]);
+            return;
+        }
+
+        $this->json(['success' => false, 'error' => 'Invalid DJ credentials'], 401);
     }
 }

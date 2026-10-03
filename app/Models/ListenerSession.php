@@ -17,7 +17,7 @@ class ListenerSession extends BaseModel
 
         return static::create([
             'ip_hash' => substr($ipHash, 0, 16),
-            'user_agent' => substr(htmlspecialchars($userAgent, ENT_QUOTES, 'UTF-8'), 0, 255),
+            'user_agent' => substr(trim($userAgent), 0, 255),
             'mountpoint' => $mountpoint,
             'duration' => $duration,
             'connected_at' => new UTCDateTime(),

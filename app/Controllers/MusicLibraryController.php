@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\Song;
+use App\Models\PlaylistItem;
 use App\Helpers\Id3TagReader;
 use App\Services\LiquidsoapService;
 
@@ -227,6 +228,7 @@ class MusicLibraryController extends BaseController
         }
 
         Song::delete($id);
+        PlaylistItem::deleteBySongId($id);
         log_activity('delete_song', ['id' => $id, 'title' => $song['title']]);
 
         // Sync playlists

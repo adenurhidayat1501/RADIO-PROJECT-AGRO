@@ -38,14 +38,26 @@ do {
 
             // If scheduled mode is auto_dj with a specific playlist, ensure liquidsoap plays it
             if ($activeSlot['mode'] === 'auto_dj' && !empty($activeSlot['playlist_id'])) {
-                // If playlist exists, we can dynamically link it as default.m3u
                 $playlistsDir = config('radio.paths.playlists_dir', '/var/lib/radio/playlists');
-                $targetM3u = $playlistsDir . "/playlist_{$activeSlot['playlist_id']}.m3u";
+                $pId = (string) $activeSlot['playlist_id'];
+                $targetM3u = $playlistsDir . "/playlist_{$pId}.m3u";
                 $defaultM3u = $playlistsDir . '/default.m3u';
 
+                if (!file_exists($targetM3u) && !empty($activeSlot['playlist_name'])) {
+                    $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string) $activeSlot['playlist_name']);
+                    $targetM3u = $playlistsDir . "/playlist_{$safeName}.m3u";
+                }
+
                 if (file_exists($targetM3u)) {
-                    // Update symlink or copy to default.m3u
+                    // Update default.m3u with fresh timestamp
                     @copy($targetM3u, $defaultM3u);
+                    @touch($defaultM3u);
+
+                    // Notify Liquidsoap to reload playlist
+                    try {
+                        $liq = new LiquidsoapService();
+                        $liq->sendTelnet('autodj.reload');
+                    } catch (\Throwable $e) {}
                 }
             }
 

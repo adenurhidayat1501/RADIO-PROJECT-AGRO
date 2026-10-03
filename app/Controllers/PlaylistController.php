@@ -97,11 +97,15 @@ class PlaylistController extends BaseController
 
     public function reorder(string $id): void
     {
-        $order = $_POST['order'] ?? [];
-        if (is_array($order)) {
+        $raw = file_get_contents('php://input');
+        $json = json_decode($raw, true) ?? [];
+        $order = $_POST['order'] ?? ($json['order'] ?? []);
+
+        if (is_array($order) && !empty($order)) {
             PlaylistItem::reorder($id, $order);
             $this->syncLiquidsoap();
-            $this->json(['success' => true]);
+            $this->json(['success' => true, 'message' => 'Playlist order saved successfully!']);
+            return;
         }
         $this->json(['error' => 'Invalid order data'], 400);
     }

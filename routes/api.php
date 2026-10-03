@@ -31,4 +31,8 @@ Router::post('/api/admin/radio/live', [RadioControlApiController::class, 'toggle
 Router::get('/api/internal/liquidsoap/on-track', [RadioControlApiController::class, 'onTrack']);
 Router::post('/api/internal/liquidsoap/on-track', [RadioControlApiController::class, 'onTrack']);
 Router::get('/api/internal/liquidsoap/on-live-connect', [RadioControlApiController::class, 'onLiveConnect']);
+Router::post('/api/internal/liquidsoap/on-live-connect', [RadioControlApiController::class, 'onLiveConnect']);
 Router::get('/api/internal/liquidsoap/on-live-disconnect', [RadioControlApiController::class, 'onLiveDisconnect']);
+Router::post('/api/internal/liquidsoap/on-live-disconnect', [RadioControlApiController::class, 'onLiveDisconnect']);
+Router::post('/api/internal/liquidsoap/auth-dj', [RadioControlApiController::class, 'authDj']);
+Router::get('/api/internal/liquidsoap/auth-dj', [RadioControlApiController::class, 'authDj']);

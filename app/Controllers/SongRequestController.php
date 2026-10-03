@@ -52,7 +52,7 @@ class SongRequestController extends BaseController
                     $liq = new LiquidsoapService();
                     // Push song to liquidsoap queue via telnet
                     $escaped = escapeshellarg($song['filepath']);
-                    $liq->sendTelnet("autodj.push {$song['filepath']}");
+                    $liq->sendTelnet("autodj.push {$escaped}");
                 } catch (\Throwable $e) {}
             }
 

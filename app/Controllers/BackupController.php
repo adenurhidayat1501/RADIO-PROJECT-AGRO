@@ -52,7 +52,8 @@ class BackupController extends BaseController
         }
 
         $file = $_FILES['backup_file'];
-        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $origName = strtolower($file['name']);
+        $ext = str_ends_with($origName, '.tar.gz') ? 'tar.gz' : (pathinfo($origName, PATHINFO_EXTENSION) ?: 'archive');
         $tempPath = __DIR__ . '/../../storage/backups/temp_restore_' . time() . '.' . $ext;
 
         if (move_uploaded_file($file['tmp_name'], $tempPath)) {

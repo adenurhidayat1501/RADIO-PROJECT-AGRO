@@ -96,7 +96,7 @@ class LiquidsoapService
         @file_put_contents($defaultM3u, implode("\n", $lines) . "\n");
         $written['default'] = $defaultM3u;
 
-        // 2. Export named active playlists
+        // 2. Export named active playlists (Export both safe-name and Mongo ObjectId formats)
         $playlists = Playlist::find(['status' => 'active']);
         foreach ($playlists as $pl) {
             $plSongs = Playlist::getSongs((string) $pl['_id']);
@@ -108,10 +108,16 @@ class LiquidsoapService
             }
 
             if (!empty($plLines)) {
+                $content = implode("\n", $plLines) . "\n";
                 $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string) $pl['name']);
                 $plFile = $this->playlistsDir . "/playlist_{$safeName}.m3u";
-                @file_put_contents($plFile, implode("\n", $plLines) . "\n");
+                $plIdFile = $this->playlistsDir . "/playlist_" . ((string) $pl['_id']) . ".m3u";
+
+                @file_put_contents($plFile, $content);
+                @file_put_contents($plIdFile, $content);
+
                 $written[(string) $pl['_id']] = $plFile;
+                $written[(string) $pl['_id'] . '_id'] = $plIdFile;
             }
         }
 
@@ -157,6 +163,24 @@ class LiquidsoapService
 
         $apiUrl = rtrim(config('app.url', 'http://127.0.0.1:8080'), '/');
 
+        // Escaper helper for safe string interpolation into Liquidsoap 2.x syntax
+        $liqEsc = static function ($val): string {
+            return addcslashes((string) ($val ?? ''), "\"\\");
+        };
+
+        $mountEsc = $liqEsc($mount);
+        $icecastHostEsc = $liqEsc($icecastHost);
+        $sourcePasswordEsc = $liqEsc($sourcePassword);
+        $harborMountEsc = $liqEsc($harborMount);
+        $harborUserEsc = $liqEsc($harborUser);
+        $harborPassEsc = $liqEsc($harborPass);
+        $playlistsDirEsc = $liqEsc($playlistsDir);
+        $fallbackAudioEsc = $liqEsc($fallbackAudio);
+        $stationNameEsc = $liqEsc($station['name'] ?? 'Radio Agro');
+        $stationDescEsc = $liqEsc($station['description'] ?? 'Radio Komunitas Agro');
+        $stationGenreEsc = $liqEsc($station['genre'] ?? 'Various');
+        $apiUrlEsc = $liqEsc($apiUrl);
+
         // Build Liquidsoap Script (Compatible with Liquidsoap 2.2.x on Ubuntu 24.04 LTS)
         $liq = <<<LIQ
 #!/usr/bin/liquidsoap
@@ -185,21 +209,21 @@ def notify_metadata(m) =
   t_title = if title != "" then title else "Unknown Title" end
   print("TRACK TRANSITION: #{t_artist} - #{t_title}")
   # Notify local web API in background
-  ignore(http.get("{$apiUrl}/api/internal/liquidsoap/on-track?artist=" ^ url.encode(t_artist) ^ "&title=" ^ url.encode(t_title)))
+  ignore(http.get("{$apiUrlEsc}/api/internal/liquidsoap/on-track?artist=" ^ url.encode(t_artist) ^ "&title=" ^ url.encode(t_title)))
 end
 
 def notify_live_connect(m) =
   print("LIVE DJ CONNECTED")
-  ignore(http.get("{$apiUrl}/api/internal/liquidsoap/on-live-connect"))
+  ignore(http.get("{$apiUrlEsc}/api/internal/liquidsoap/on-live-connect"))
 end
 
 def notify_live_disconnect() =
   print("LIVE DJ DISCONNECTED")
-  ignore(http.get("{$apiUrl}/api/internal/liquidsoap/on-live-disconnect"))
+  ignore(http.get("{$apiUrlEsc}/api/internal/liquidsoap/on-live-disconnect"))
 end
 
 # 4. Emergency Fallback Source (Plays safety file or tone if all sources fail)
-security_file = single(id="security_single", "{$fallbackAudio}")
+security_file = single(id="security_single", "{$fallbackAudioEsc}")
 security_tone = sine(id="emergency_sine", 440.0)
 emergency_source = fallback(track_sensitive=false, [security_file, security_tone])
 
@@ -208,7 +232,7 @@ autodj_playlist = playlist(
   id="autodj",
   mode="randomize",
   reload_mode="watch",
-  "{$playlistsDir}/default.m3u"
+  "{$playlistsDirEsc}/default.m3u"
 )
 
 # Optional Jingle Rotation (1 jingle every 4 tracks if jingles.m3u has content)
@@ -216,18 +240,32 @@ jingles_playlist = playlist(
   id="jingles",
   mode="randomize",
   reload_mode="watch",
-  "{$playlistsDir}/jingles.m3u"
+  "{$playlistsDirEsc}/jingles.m3u"
 )
 
 autodj_mixed = rotate(weights=[1, 4], [jingles_playlist, autodj_playlist])
 autodj_source = fallback(track_sensitive=false, [autodj_mixed, autodj_playlist, emergency_source])
 
 # 6. Live DJ Harbor Source (Accepts Icecast / Shoutcast connections from Mixxx, BUTT, OBS)
+# Validates both global harbor credentials and individual DJ accounts via API
+def harbor_auth(user, pass) =
+  if user == "{$harborUserEsc}" and pass == "{$harborPassEsc}" then
+    true
+  else
+    auth_resp = http.post(
+      headers=[("Content-Type", "application/x-www-form-urlencoded")],
+      data="user=" ^ url.encode(user) ^ "&password=" ^ url.encode(pass),
+      "{$apiUrlEsc}/api/internal/liquidsoap/auth-dj"
+    )
+    auth_resp.status_code == 200
+  end
+end
+
 live_harbor = input.harbor(
   id="live_dj",
-  "{$harborMount}",
+  "{$harborMountEsc}",
   port={$harborPort},
-  auth=fun(user, pass) -> (user == "{$harborUser}" and pass == "{$harborPass}"),
+  auth=harbor_auth,
   on_connect=notify_live_connect,
   on_disconnect=notify_live_disconnect
 )
@@ -260,14 +298,14 @@ radio_stream = crossfade(
 output.icecast(
   %mp3(bitrate={$bitrate}),
   id="output_icecast",
-  host="{$icecastHost}",
+  host="{$icecastHostEsc}",
   port={$icecastPort},
-  password="{$sourcePassword}",
-  mount="{$mount}",
-  name="{$station['name']}",
-  description="{$station['description']}",
-  genre="{$station['genre']}",
-  url="{$apiUrl}",
+  password="{$sourcePasswordEsc}",
+  mount="{$mountEsc}",
+  name="{$stationNameEsc}",
+  description="{$stationDescEsc}",
+  genre="{$stationGenreEsc}",
+  url="{$apiUrlEsc}",
   public=false,
   mksafe(radio_stream)
 )

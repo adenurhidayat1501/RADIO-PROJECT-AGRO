@@ -70,4 +70,17 @@ class PlaylistItem extends BaseModel
 
         return $res->getDeletedCount();
     }
+
+    public static function deleteBySongId(string $songId): int
+    {
+        if (!Database::isValidObjectId($songId)) {
+            return 0;
+        }
+
+        $res = static::getCollection()->deleteMany([
+            'song_id' => Database::toObjectId($songId)
+        ]);
+
+        return $res->getDeletedCount();
+    }
 }

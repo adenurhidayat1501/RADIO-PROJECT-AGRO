@@ -288,6 +288,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 3. Skip Button Action
     const skipBtn = document.getElementById('btn-skip-track');
+    const csrfToken = '<?= csrf_token() ?>';
+
     if (skipBtn) {
         skipBtn.addEventListener('click', function () {
             if (!confirm('Are you sure you want to skip the currently playing track?')) return;
@@ -295,7 +297,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             fetch('<?= base_url('api/admin/radio/skip') ?>', {
                 method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken
+                }
             })
             .then(res => res.json())
             .then(data => {
@@ -316,8 +322,13 @@ document.addEventListener('DOMContentLoaded', function () {
             restartBtn.disabled = true;
             fetch('<?= base_url('api/admin/radio/auto-dj') ?>', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'action=restart'
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: 'action=restart&csrf_token=' + encodeURIComponent(csrfToken)
             })
             .then(res => res.json())
             .then(data => {

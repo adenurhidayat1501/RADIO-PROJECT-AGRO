@@ -19,9 +19,9 @@ class SongRequest extends BaseModel
     public static function createRequest(string $name, string $songId, string $message = ''): array
     {
         return static::create([
-            'name' => htmlspecialchars(trim($name), ENT_QUOTES, 'UTF-8'),
+            'name' => trim($name),
             'song_id' => Database::toObjectId($songId),
-            'message' => htmlspecialchars(trim($message), ENT_QUOTES, 'UTF-8'),
+            'message' => trim($message),
             'status' => 'pending',
             'played_at' => null,
             'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',

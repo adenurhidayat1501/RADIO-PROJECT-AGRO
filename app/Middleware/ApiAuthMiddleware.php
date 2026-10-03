@@ -20,15 +20,17 @@ class ApiAuthMiddleware
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         $apiKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
-        $secret = config('app.secret');
-        if ($apiKey === $secret) {
-            return;
-        }
-
-        if (str_starts_with($authHeader, 'Bearer ')) {
-            $token = substr($authHeader, 7);
-            if ($token === $secret) {
+        $secret = (string) config('app.secret', '');
+        if ($secret !== '') {
+            if (!empty($apiKey) && hash_equals($secret, $apiKey)) {
                 return;
+            }
+
+            if (str_starts_with($authHeader, 'Bearer ')) {
+                $token = substr($authHeader, 7);
+                if (!empty($token) && hash_equals($secret, $token)) {
+                    return;
+                }
             }
         }
 

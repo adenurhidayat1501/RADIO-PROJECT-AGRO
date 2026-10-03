@@ -67,11 +67,22 @@ class UserController extends BaseController
             $this->redirect('admin/users', ['error' => 'User not found.']);
         }
 
+        $newRole = trim((string) ($_POST['role'] ?? ''));
+        $newStatus = trim((string) ($_POST['status'] ?? ''));
+
+        if ($user['username'] === 'admin') {
+            $newRole = 'admin';
+            $newStatus = 'active';
+        } else {
+            $newRole = !empty($newRole) ? $newRole : ($user['role'] ?? 'viewer');
+            $newStatus = !empty($newStatus) ? $newStatus : ($user['status'] ?? 'active');
+        }
+
         $data = [
             'display_name' => trim((string) ($_POST['display_name'] ?? $user['display_name'])),
             'email' => trim((string) ($_POST['email'] ?? $user['email'])),
-            'role' => trim((string) ($_POST['role'] ?? $user['role'])),
-            'status' => trim((string) ($_POST['status'] ?? $user['status'])),
+            'role' => $newRole,
+            'status' => $newStatus,
         ];
 
         // If new password provided

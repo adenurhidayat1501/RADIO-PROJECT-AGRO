@@ -134,9 +134,12 @@ class RadioApiController extends BaseController
      */
     public function submitSongRequest(): void
     {
-        $name = trim((string) ($_POST['name'] ?? ''));
-        $songId = trim((string) ($_POST['song_id'] ?? ''));
-        $message = trim((string) ($_POST['message'] ?? ''));
+        $raw = file_get_contents('php://input');
+        $json = json_decode($raw, true) ?? [];
+
+        $name = trim((string) ($_POST['name'] ?? ($json['name'] ?? '')));
+        $songId = trim((string) ($_POST['song_id'] ?? ($json['song_id'] ?? '')));
+        $message = trim((string) ($_POST['message'] ?? ($json['message'] ?? '')));
 
         if (empty($name)) {
             $this->json(['error' => 'Please enter your name.'], 400);

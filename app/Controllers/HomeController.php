@@ -35,6 +35,9 @@ class HomeController extends BaseController
         // Recent played / approved song requests
         $recentRequests = SongRequest::getRecentPublic(6);
 
+        // Active show right now
+        $activeSlot = Schedule::getCurrentActiveSlot($dayOfWeek, date('H:i'));
+
         // Active DJs
         $djs = DjAccount::find(['status' => 'active'], ['limit' => 6]);
 
@@ -44,6 +47,7 @@ class HomeController extends BaseController
             'streamUrl' => $streamUrl,
             'status' => $status,
             'todaySchedules' => $todaySchedules,
+            'activeSlot' => $activeSlot,
             'programs' => $programs,
             'recentRequests' => $recentRequests,
             'djs' => $djs,

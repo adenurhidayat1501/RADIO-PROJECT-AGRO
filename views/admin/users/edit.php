@@ -42,6 +42,9 @@
                                             <option value="dj" <?= ($user['role'] ?? '') === 'dj' ? 'selected' : '' ?>>DJ</option>
                                             <option value="viewer" <?= ($user['role'] ?? '') === 'viewer' ? 'selected' : '' ?>>Viewer</option>
                                         </select>
+                                        <?php if ($user['username'] === 'admin'): ?>
+                                            <input type="hidden" name="role" value="admin">
+                                        <?php endif; ?>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label fw-semibold">Account Status</label>
@@ -49,6 +52,9 @@
                                             <option value="active" <?= ($user['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option>
                                             <option value="inactive" <?= ($user['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option>
                                         </select>
+                                        <?php if ($user['username'] === 'admin'): ?>
+                                            <input type="hidden" name="status" value="active">
+                                        <?php endif; ?>
                                     </div>
                                 </div>
 
