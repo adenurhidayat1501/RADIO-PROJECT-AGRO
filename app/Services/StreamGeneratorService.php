@@ -15,18 +15,30 @@ class StreamGeneratorService
         $mount = $customMount ?? ($stream['mountpoint'] ?? config('radio.icecast.mountpoint', '/live'));
         $mount = '/' . ltrim($mount, '/');
 
+        $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+            || (isset($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))
+            || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+
         $publicUrl = config('radio.icecast.public_url');
+        // If an explicit external public URL is configured (not 127.0.0.1 or localhost):
         if (!empty($publicUrl)) {
             $parsed = parse_url($publicUrl);
-            $scheme = $parsed['scheme'] ?? 'http';
-            $host = $parsed['host'] ?? '127.0.0.1';
-            $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
-            return "{$scheme}://{$host}{$port}{$mount}";
+            $host = $parsed['host'] ?? '';
+            if (!empty($host) && $host !== '127.0.0.1' && $host !== 'localhost') {
+                $scheme = $parsed['scheme'] ?? ($isHttps ? 'https' : 'http');
+                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+                return "{$scheme}://{$host}{$port}{$mount}";
+            }
         }
 
-        $host = config('radio.icecast.host', '127.0.0.1');
-        $port = config('radio.icecast.port', 8000);
-        return "http://{$host}:{$port}{$mount}";
+        // If accessed through web server (e.g. https://radio.dadofy.xyz), use current host + proxy mount
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $scheme = $isHttps ? 'https' : 'http';
+            return "{$scheme}://{$_SERVER['HTTP_HOST']}{$mount}";
+        }
+
+        return base_url(ltrim($mount, '/'));
     }
 
     public static function getM3uUrl(): string

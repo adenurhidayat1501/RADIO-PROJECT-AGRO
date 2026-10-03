@@ -28,15 +28,28 @@ document.addEventListener('DOMContentLoaded', function () {
         playBtn.addEventListener('click', function () {
             if (audio.paused) {
                 // Bust cache on stream connect to prevent buffer lag
-                audio.src = '<?= e(\App\Services\StreamGeneratorService::getStreamUrl()) ?>?t=' + Date.now();
+                let streamSrc = '<?= e(\App\Services\StreamGeneratorService::getStreamUrl()) ?>';
+                if (!streamSrc || streamSrc.includes('127.0.0.1') || streamSrc.includes('localhost')) {
+                    streamSrc = window.location.origin + '/live';
+                } else if (window.location.protocol === 'https:' && streamSrc.startsWith('http:')) {
+                    streamSrc = streamSrc.replace(/^http:/, 'https:');
+                }
+                const sep = streamSrc.includes('?') ? '&' : '?';
+                audio.src = streamSrc + sep + 't=' + Date.now();
                 audio.play().then(() => {
                     playBtn.innerHTML = '<i class="bi bi-stop-fill text-danger"></i>';
                 }).catch(err => {
-                    console.error('Audio play blocked:', err);
+                    console.warn('Admin audio play initial attempt failed, retrying origin /live:', err);
+                    audio.src = window.location.origin + '/live?t=' + Date.now();
+                    audio.play().then(() => {
+                        playBtn.innerHTML = '<i class="bi bi-stop-fill text-danger"></i>';
+                    }).catch(retryErr => {
+                        console.error('Admin audio play blocked:', retryErr);
+                    });
                 });
             } else {
                 audio.pause();
-                audio.src = '';
+                audio.removeAttribute('src');
                 playBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
             }
         });

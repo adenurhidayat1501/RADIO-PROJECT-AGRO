@@ -729,8 +729,17 @@
 <!-- Global Radio Config for player.js -->
 <script>
 window.RADIO_CONFIG = {
-    baseUrl: '<?= rtrim(base_url(), '/') ?>',
-    streamUrl: '<?= e($streamUrl) ?>'
+    baseUrl: window.location.origin,
+    streamUrl: (function() {
+        var s = '<?= e($streamUrl) ?>';
+        if (!s || s.indexOf('127.0.0.1') !== -1 || s.indexOf('localhost') !== -1) {
+            return window.location.origin + '/live';
+        }
+        if (window.location.protocol === 'https:' && s.indexOf('http:') === 0) {
+            return s.replace(/^http:/, 'https:');
+        }
+        return s;
+    })()
 };
 </script>
 

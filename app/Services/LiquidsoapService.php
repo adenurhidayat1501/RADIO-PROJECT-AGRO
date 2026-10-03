@@ -78,7 +78,14 @@ class LiquidsoapService
         $written = [];
 
         // 1. All active songs fallback playlist
-        $allSongs = Song::find(['enabled' => true]);
+        $allSongs = Song::find([
+            '$or' => [
+                ['enabled' => true],
+                ['enabled' => 1],
+                ['enabled' => '1'],
+                ['enabled' => ['$exists' => false]],
+            ]
+        ]);
         $defaultM3u = $this->playlistsDir . '/default.m3u';
         $lines = [];
         foreach ($allSongs as $song) {
@@ -87,13 +94,27 @@ class LiquidsoapService
             }
         }
 
-        // If no music exists, use fallback file
+        // Direct storage folder scan: Ensure any uploaded audio in music dir is included
+        $musicDir = config('radio.paths.music', '/var/lib/radio/music');
+        if (is_dir($musicDir)) {
+            $scanned = glob($musicDir . '/*.{mp3,wav,ogg,flac,m4a,aac}', GLOB_BRACE) ?: [];
+            foreach ($scanned as $f) {
+                if (file_exists($f)) {
+                    $lines[] = $f;
+                }
+            }
+        }
+
+        $lines = array_values(array_unique(array_filter($lines)));
+
+        // If no music exists, use fallback safety audio
         if (empty($lines)) {
             $fallback = config('radio.paths.fallback', '/var/lib/radio/fallback/default.mp3');
             $lines[] = $fallback;
         }
 
         @file_put_contents($defaultM3u, implode("\n", $lines) . "\n");
+        @chmod($defaultM3u, 0664);
         $written['default'] = $defaultM3u;
 
         // 2. Export named active playlists (Export both safe-name and Mongo ObjectId formats)
@@ -317,15 +338,20 @@ LIQ;
         $this->syncPlaylistFiles();
         $this->generateConfig();
 
-        // Check if systemctl is available
+        // 1. Instant telnet commands without needing sudo privileges
+        $telnetReload = $this->sendTelnet('autodj.reload');
+        $telnetSkip = $this->sendTelnet('autodj.skip');
+
+        // 2. Also attempt systemctl if permitted
         $output = @shell_exec('sudo systemctl reload radio-liquidsoap 2>&1');
         if (!$output || str_contains($output, 'Failed')) {
-            // Try restart if reload is not supported
             $output = @shell_exec('sudo systemctl restart radio-liquidsoap 2>&1');
         }
 
         return [
             'success' => true,
+            'telnet_reload' => $telnetReload,
+            'telnet_skip' => $telnetSkip,
             'output' => trim($output ?? 'Liquidsoap configuration generated'),
         ];
     }

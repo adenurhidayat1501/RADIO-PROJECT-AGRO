@@ -18,8 +18,21 @@
             streamUrl: '/live'
         };
 
-        const baseUrl = config.baseUrl.replace(/\/+$/, '');
-        const streamBaseUrl = config.streamUrl;
+        let baseUrl = (config.baseUrl || '').replace(/\/+$/, '');
+        if (window.location.protocol === 'https:' && baseUrl.startsWith('http:')) {
+            baseUrl = baseUrl.replace(/^http:/, 'https:');
+        }
+        if (!baseUrl || baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost')) {
+            baseUrl = window.location.origin;
+        }
+
+        let streamBaseUrl = config.streamUrl || '/live';
+        // Auto-fix: Never connect to localhost or 127.0.0.1 in client browser
+        if (streamBaseUrl.includes('127.0.0.1') || streamBaseUrl.includes('localhost')) {
+            streamBaseUrl = window.location.origin + '/live';
+        } else if (window.location.protocol === 'https:' && streamBaseUrl.startsWith('http:')) {
+            streamBaseUrl = streamBaseUrl.replace(/^http:/, 'https:');
+        }
 
         // Elements
         const audio = document.getElementById('live-stream-audio');
@@ -53,7 +66,6 @@
         let lastVolume = 0.9;
         let audioCtx = null;
         let analyser = null;
-        let sourceNode = null;
         let visualizerAnimId = null;
 
         // ----------------------------------------------------------------------
@@ -93,30 +105,17 @@
         }
 
         // ----------------------------------------------------------------------
-        // 2. Web Audio API Canvas Visualizer
+        // 2. Audio Visualizer on Canvas
         // ----------------------------------------------------------------------
         function initWebAudio() {
             if (audioCtx) return;
-
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 64;
-                analyser.smoothingTimeConstant = 0.8;
-
-                // Attempt media element source with CORS
-                try {
-                    audio.crossOrigin = 'anonymous';
-                    sourceNode = audioCtx.createMediaElementSource(audio);
-                    sourceNode.connect(analyser);
-                    analyser.connect(audioCtx.destination);
-                } catch (e) {
-                    // In case stream origin blocks CORS, we use synthetic wave visualizer
-                    sourceNode = null;
+                if (AudioContext) {
+                    audioCtx = new AudioContext();
                 }
             } catch (err) {
-                console.warn('Web Audio API not supported on this browser:', err);
+                // Non-blocking
             }
         }
 
@@ -190,9 +189,20 @@
                     audioCtx.resume();
                 }
 
-                // Attach cache buster to join live audio edge directly
-                const separator = streamBaseUrl.includes('?') ? '&' : '?';
-                audio.src = streamBaseUrl + separator + 't=' + Date.now();
+                // Ensure unmuted & set volume
+                audio.muted = false;
+                audio.volume = lastVolume;
+
+                // Cache buster to connect directly to the live stream edge
+                let playUrl = streamBaseUrl;
+                if (!playUrl || playUrl.includes('127.0.0.1') || playUrl.includes('localhost')) {
+                    playUrl = window.location.origin + '/live';
+                } else if (window.location.protocol === 'https:' && playUrl.startsWith('http:')) {
+                    playUrl = playUrl.replace(/^http:/, 'https:');
+                }
+
+                const separator = playUrl.includes('?') ? '&' : '?';
+                audio.src = playUrl + separator + 't=' + Date.now();
 
                 const playPromise = audio.play();
                 if (playPromise !== undefined) {
@@ -200,14 +210,24 @@
                         setPlayingState(true);
                         showToast('Menghubungkan ke siaran live Radio Agro...', 'success');
                     }).catch(err => {
-                        console.error('Audio playback failed:', err);
-                        setPlayingState(false);
-                        showToast('Gagal memulai audio. Mohon tekan tombol sekali lagi.', 'error');
+                        console.warn('Primary stream playback failed, retrying with direct origin /live:', err);
+                        // Fallback retry directly to window.location.origin + '/live'
+                        const fallbackUrl = window.location.origin + '/live?t=' + Date.now();
+                        audio.src = fallbackUrl;
+                        audio.play().then(() => {
+                            setPlayingState(true);
+                            showToast('Menghubungkan ke siaran live Radio Agro...', 'success');
+                        }).catch(retryErr => {
+                            console.error('All audio playback attempts failed:', retryErr);
+                            setPlayingState(false);
+                            showToast('Gagal memulai audio. Mohon tekan tombol sekali lagi.', 'error');
+                        });
                     });
                 }
             } else {
                 audio.pause();
-                audio.src = '';
+                audio.removeAttribute('src');
+                audio.load();
                 setPlayingState(false);
             }
         }

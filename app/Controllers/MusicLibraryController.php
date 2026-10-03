@@ -172,10 +172,12 @@ class MusicLibraryController extends BaseController
 
         log_activity('upload_song', ['title' => $song['title'], 'artist' => $song['artist']]);
 
-        // Refresh AutoDJ playlists
+        // Refresh AutoDJ playlists and trigger immediate stream transition
         try {
             $liq = new LiquidsoapService();
             $liq->syncPlaylistFiles();
+            $liq->sendTelnet('autodj.reload');
+            $liq->sendTelnet('autodj.skip');
         } catch (\Throwable $e) {
             // Non-blocking
         }
@@ -231,10 +233,11 @@ class MusicLibraryController extends BaseController
         PlaylistItem::deleteBySongId($id);
         log_activity('delete_song', ['id' => $id, 'title' => $song['title']]);
 
-        // Sync playlists
+        // Sync playlists and reload
         try {
             $liq = new LiquidsoapService();
             $liq->syncPlaylistFiles();
+            $liq->sendTelnet('autodj.reload');
         } catch (\Throwable $e) {}
 
         $this->redirect('admin/music', ['success' => 'Track removed from library and storage.']);
