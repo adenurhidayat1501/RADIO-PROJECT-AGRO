@@ -26,6 +26,7 @@ use App\Controllers\UserController;
 use App\Controllers\BackupController;
 use App\Controllers\LogController;
 use App\Controllers\SettingController;
+use App\Controllers\DiagnosticController;
 
 // ==========================================
 // PUBLIC LISTENER PORTAL & PLAYLIST ROUTES
@@ -140,9 +141,11 @@ Router::get('/admin/backup/download/{filename}', [BackupController::class, 'down
 Router::post('/admin/backup/restore', [BackupController::class, 'restore'], $adminPostMw);
 Router::post('/admin/backup/delete/{filename}', [BackupController::class, 'delete'], $adminPostMw);
 
-// Diagnostic Logs
+// Diagnostic Logs & Health Checks
 Router::get('/admin/logs', [LogController::class, 'index'], $adminMw);
 Router::post('/admin/logs/clear/{channel}', [LogController::class, 'clear'], $adminPostMw);
+Router::get('/admin/diagnostics', [DiagnosticController::class, 'index'], $adminMw);
+Router::post('/admin/diagnostics/repair', [DiagnosticController::class, 'repair'], $adminPostMw);
 
 // System Settings
 Router::get('/admin/settings', [SettingController::class, 'index'], $adminMw);

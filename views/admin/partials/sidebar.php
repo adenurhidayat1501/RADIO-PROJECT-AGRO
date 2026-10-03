@@ -128,6 +128,12 @@ $isActive = function(string $route) use ($reqPath): string {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="<?= base_url('admin/diagnostics') ?>" class="nav-link <?= $isActive('admin/diagnostics') ?>">
+                        <i class="nav-icon bi bi-heart-pulse text-danger"></i>
+                        <p>Analisis Error & Health</p>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="<?= base_url('admin/logs') ?>" class="nav-link <?= $isActive('admin/logs') ?>">
                         <i class="nav-icon bi bi-terminal"></i>
                         <p>System Logs</p>
