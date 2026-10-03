@@ -298,25 +298,40 @@ class DiagnosticService
         $telnetPort = (int) config('radio.liquidsoap.telnet_port', 1234);
         $harborPort = (int) config('radio.liquidsoap.harbor_port', 8005);
         $configPath = config('radio.paths.generated_config', '/etc/radio/radio.liq');
+        $liqService = new LiquidsoapService();
 
-        // Check if config file exists
+        // Check if config file exists and validate syntax
         if (file_exists($configPath)) {
+            $liqContent = (string) @file_get_contents($configPath);
+            // Proactively auto-heal old on_metadata syntax
+            if (str_contains($liqContent, 'on_metadata(notify_metadata,')) {
+                $liqService->generateConfig();
+                $configPath = config('radio.paths.generated_config', '/etc/radio/radio.liq');
+            }
+
+            // Syntax validation check
+            $syntaxOutput = @shell_exec("liquidsoap --check " . escapeshellarg($configPath) . " 2>&1");
+            $hasSyntaxError = $syntaxOutput && (str_contains($syntaxOutput, 'Error') || str_contains($syntaxOutput, 'exception'));
+
+            $checks[] = [
+                'key' => 'liquidsoap_config',
+                'category' => 'Auto DJ',
+                'name' => 'Konfigurasi Script Liquidsoap (/etc/radio/radio.liq)',
+                'status' => $hasSyntaxError ? 'error' : 'ok',
+                'message' => $hasSyntaxError 
+                    ? "Kesalahan sintaks Liquidsoap: " . trim(explode("\n", trim($syntaxOutput))[0] ?? 'Syntax error') 
+                    : "File konfigurasi valid & kompatibel dengan Liquidsoap 2.2 (" . round(filesize($configPath) / 1024, 1) . " KB).",
+                'remedy' => $hasSyntaxError ? 'php scripts/generate-liquidsoap.php' : null,
+            ];
+        } else {
+            $liqService->generateConfig();
             $checks[] = [
                 'key' => 'liquidsoap_config',
                 'category' => 'Auto DJ',
                 'name' => 'Konfigurasi Script Liquidsoap (/etc/radio/radio.liq)',
                 'status' => 'ok',
-                'message' => "File konfigurasi ditemukan (" . round(filesize($configPath) / 1024, 1) . " KB).",
+                'message' => "File konfigurasi baru saja dibuat otomatis.",
                 'remedy' => null,
-            ];
-        } else {
-            $checks[] = [
-                'key' => 'liquidsoap_config',
-                'category' => 'Auto DJ',
-                'name' => 'Konfigurasi Script Liquidsoap (/etc/radio/radio.liq)',
-                'status' => 'warning',
-                'message' => "File {$configPath} belum dibuat.",
-                'remedy' => 'Klik tombol Reload AutoDJ di Admin Dashboard atau jalankan php scripts/generate-liquidsoap.php',
             ];
         }
 
@@ -594,13 +609,18 @@ class DiagnosticService
         $liqService->generateConfig();
         $results[] = 'File konfigurasi /etc/radio/radio.liq diperbarui.';
 
-        // 5. Send instant Telnet reload & skip
+        // Ensure file permissions for daemon user radio
+        @shell_exec('chown -R radio:radio /etc/radio 2>/dev/null; chmod -R 755 /etc/radio 2>/dev/null');
+        @shell_exec('chown -R www-data:radio /var/lib/radio /var/log/radio 2>/dev/null; chmod -R 2775 /var/lib/radio /var/log/radio 2>/dev/null');
+
+        // 5. Restart daemon directly (as root or with sudo)
+        @shell_exec('systemctl restart radio-liquidsoap 2>&1 || sudo systemctl restart radio-liquidsoap 2>&1');
+        sleep(1);
+
+        // 6. Send instant Telnet reload & skip
         $reloadRes = $liqService->sendTelnet('autodj.reload');
         $skipRes = $liqService->sendTelnet('autodj.skip');
-        $results[] = "Perintah Telnet dikirim ke Liquidsoap (reload: {$reloadRes}, skip: {$skipRes}).";
-
-        // 6. Restart daemon if possible
-        @shell_exec('sudo systemctl restart radio-liquidsoap 2>&1');
+        $results[] = "Layanan radio-liquidsoap direstart (telnet status: reload={$reloadRes}, skip={$skipRes}).";
 
         return [
             'success' => true,
